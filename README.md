@@ -1,6 +1,6 @@
 This small project is a naive implementation of [Conway's Game of Life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life) on a [Peggy 2](http://shop.evilmadscientist.com/productsmenu/75) board.
 
-![Image of the Peggy 2 board](http://raw.github.com/pierreca/Peggy2GameOfLife/master/peggy2frame.jpg)
+![Image of the Peggy 2 board](https://raw.githubusercontent.com/pierreca/Peggy2GameOfLife/master/pictures/peggy2frame.jpg)
 
 # How it works
 The algorithm starts as soon as the Peggy 2 board is powered. It will randomly initialize the first frame, then run Conway's rules on each cells.
