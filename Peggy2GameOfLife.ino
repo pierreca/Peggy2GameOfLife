@@ -67,7 +67,7 @@ void ShowCounterScreen(int timeInSeconds)
 void setup()
 {
   peggy2ConwayEngine = new Peggy2ConwayEngine(4);
-  peggy2ConwayEngine->Initialize(Blinker);
+  peggy2ConwayEngine->Initialize(Random);
   stepCounter.IncrementCount();
   
   displayStepCounter = false;
