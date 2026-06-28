@@ -4,7 +4,7 @@
 Peggy2ConwayEngine::Peggy2ConwayEngine(unsigned short genMemorySize)
 {
   this->genMemorySize = genMemorySize;
-  this->genMemory = (ConwayGrid **)malloc(genMemorySize * sizeof(ConwayGrid *));
+  this->genMemory = new ConwayGrid*[genMemorySize];
   for (unsigned short i = 0; i < genMemorySize; i++)
   {
     this->genMemory[i] = new ConwayGrid();
