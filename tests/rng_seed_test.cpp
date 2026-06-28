@@ -17,7 +17,6 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <cassert>
 #include <cstdio>
 
 static const int ROWS = 25;
@@ -53,12 +52,18 @@ int main()
   //    generator are not the same one.
   seedRng(1);   fillFrame(frameA);
   seedRng(2);   fillFrame(frameB);
-  assert(!framesEqual(frameA, frameB) && "different seeds must vary the first frame");
+  if (framesEqual(frameA, frameB)) {
+    printf("FAIL: different seeds must vary the first frame\n");
+    return 1;
+  }
 
   // 2. The generator that is seeded is the generator used to init:
   //    re-seeding with the same value reproduces the same frame.
   seedRng(1);   fillFrame(frameA2);
-  assert(framesEqual(frameA, frameA2) && "same seed must reproduce the same frame");
+  if (!framesEqual(frameA, frameA2)) {
+    printf("FAIL: same seed must reproduce the same frame\n");
+    return 1;
+  }
 
   // 3. Regression guard for the original bug: without seeding, the frame is
   //    a fixed sequence (rand() defaults to seed 1), i.e. identical every
@@ -66,7 +71,10 @@ int main()
   int unseeded[ROWS][COLUMNS];
   srand(1); // libc default seed -> the "always identical" behaviour
   fillFrame(unseeded);
-  assert(framesEqual(unseeded, frameA) && "unseeded run is the fixed default sequence");
+  if (!framesEqual(unseeded, frameA)) {
+    printf("FAIL: unseeded run is the fixed default sequence\n");
+    return 1;
+  }
 
   printf("PASS: init generator (rand) is controlled by its seed (srand); "
          "distinct seeds produce distinct first frames.\n");
