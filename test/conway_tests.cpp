@@ -2,9 +2,9 @@
 // patterns (issue #6). Built off-device against the shared host harness
 // (HostGrid, selected via -DCONWAY_HOST_BUILD; issue #5).
 //
-// All fixtures live in the interior of the 25x25 grid, away from the edges,
-// so the toroidal wrap is never exercised and the engine reproduces standard
-// infinite-grid Conway behavior.
+// All fixtures live in the interior of the 25x25 grid, away from the edges, so
+// the engine's toroidal wrapping does not affect the expected results and these
+// tests pin standard infinite-grid Conway behavior.
 
 #include "Peggy2ConwayEngine.h"
 
@@ -15,8 +15,8 @@
 using Cell = std::pair<int, int>;   // (x = column, y = row)
 using Cells = std::vector<Cell>;
 
-// Shared interior fixtures (kept off the edges so the engine's issue-#4 wrap
-// is never exercised).
+// Shared interior fixtures (kept off the edges so toroidal wrapping doesn't
+// affect the expected results).
 static const Cells kBlock  = {{11, 11}, {12, 11}, {11, 12}, {12, 12}};
 static const Cells kGlider = {{10, 10}, {12, 10}, {12, 11}, {11, 11}, {11, 12}};
 
