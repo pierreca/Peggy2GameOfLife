@@ -1,8 +1,8 @@
 // Host-only compat shim, force-included into StepCounter.cpp for the leak test.
 // Provides a utoa() (AVR libc only) and a counting malloc wrapper so the test
 // can prove counterToString() performs no per-call heap allocation.
-#ifndef __HOST_COMPAT_H__
-#define __HOST_COMPAT_H__
+#ifndef HOST_COMPAT_H
+#define HOST_COMPAT_H
 
 #include <stdlib.h>
 #include <stdio.h>
