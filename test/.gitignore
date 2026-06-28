@@ -1,0 +1,3 @@
+test_counterToString
+test_counterToString_asan
+*.dSYM/

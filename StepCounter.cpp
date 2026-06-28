@@ -33,14 +33,10 @@ char* StepCounter::GetMaxCountString()
 
 char *StepCounter::counterToString(unsigned int counter)
 {
-	unsigned short length = 2; // at least 1 number + null terminator
-	
-	if (counter > 10) length++;
-	if (counter > 100) length++;
-	if (counter > 1000) length++;
-	if (counter > 10000) length++;
-	
-	char *result = (char *)malloc(length);
+	// Size for the widest decimal string itoa can produce: at most 3 digits
+	// per byte (the slack also absorbs the '-' itoa emits for base-10 values
+	// above INT_MAX), plus the null terminator.
+	char *result = (char *)malloc(sizeof(unsigned int) * 3 + 1);
 	itoa(counter, result, 10);
 	
 	return result;
