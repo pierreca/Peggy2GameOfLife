@@ -57,8 +57,15 @@ void Peggy2ConwayEngine::ComputeNextGen()
     for (int j = 0; j < COLUMNS; j++)
     {
       nextGen->WritePoint(j, i, isAlive(currentGen->GetPoint(j, i), getNeighborCount(j, i)));
-      currentGen->RefreshAll(1);
     }
+    // Keep the displayed (current) frame lit during this blocking compute pass.
+    // The Peggy 2 is a multiplexed matrix that goes dark without a continuous
+    // RefreshAll, and the timer callback runs synchronously inside loop(), so
+    // loop()'s own refresh is paused while we compute. Refreshing once per row
+    // (vs once per cell originally) keeps persistence-of-vision flicker-free at
+    // a fraction of the overhead. RefreshAll is part of the ConwayGrid interface
+    // (a no-op on the host grid), so this stays display-agnostic.
+    currentGen->RefreshAll(1);
   }
 }
 
@@ -135,7 +142,6 @@ unsigned short Peggy2ConwayEngine::isAlive(unsigned short currentState, unsigned
   unsigned short newState = 0;
 
   // error cases - should do something else than clipping...
-  if (neighborCount < 0) neighborCount = 0;
   if (neighborCount > 8) neighborCount = 8;
   
   // if (neighborCount < 2 || neighborCount > 3) newState = 0; // useless, already initialized to false
