@@ -19,11 +19,11 @@ bool displayStepCounter = false;
 
 // Seed the same generator that InitializeRandom() draws from (stdlib rand()),
 // from a genuinely varying source so each power-on starts differently. An
-// unconnected analog pin reads electrical noise, which beats millis() (~0 at
-// startup). Must run before the first random frame is generated.
+// unconnected analog pin (A0) reads electrical noise, which beats millis() (~0
+// at startup). Must run before the first random frame is generated.
 void SeedRandom()
 {
-  srand(analogRead(0));
+  srand(analogRead(A0));
 }
 
 void GameOfLifeStep()
