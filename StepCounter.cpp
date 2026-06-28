@@ -23,25 +23,20 @@ void StepCounter::IncrementCount()
 
 char* StepCounter::GetCurrentCountString()
 {
-	return counterToString(this->currentCount);
+	return counterToString(this->currentCount, this->currentCountString);
 }
 
 char* StepCounter::GetMaxCountString()
 {
-	return counterToString(this->maxCount);
+	return counterToString(this->maxCount, this->maxCountString);
 }
 
-char *StepCounter::counterToString(unsigned int counter)
+char *StepCounter::counterToString(unsigned int counter, char *buffer)
 {
-	unsigned short length = 2; // at least 1 number + null terminator
-	
-	if (counter > 10) length++;
-	if (counter > 100) length++;
-	if (counter > 1000) length++;
-	if (counter > 10000) length++;
-	
-	char *result = (char *)malloc(length);
-	itoa(counter, result, 10);
-	
-	return result;
+	// Fills a caller-owned member buffer instead of allocating a new string each
+	// call, so the steady-state loop produces zero heap churn (issue #1).
+	// utoa (not itoa): counter is unsigned and runs past INT_MAX on a board left
+	// running for hours, which signed itoa would render as a negative number.
+	utoa(counter, buffer, 10);
+	return buffer;
 }

@@ -1,2 +1,4 @@
 conway_tests
+runner
+*.o
 *.dSYM/
