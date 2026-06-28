@@ -47,28 +47,36 @@ int main()
   ConwayGrid* grid = engine.GetCurrentFrame();
   grid->Clear();
 
-  // ---- Single live cell in the far corner (24,24). --------------------------
+  // Edge coordinates derived from the grid dimensions so the test tracks
+  // ROWS/COLUMNS instead of hard-coding 24/12 (which would silently diverge if
+  // the grid size ever changed). The engine wrap logic uses the same constants.
+  const int maxX = COLUMNS - 1;   // last column
+  const int maxY = ROWS - 1;      // last row
+  const int midX = COLUMNS / 2;   // an interior column
+  const int midY = ROWS / 2;      // an interior row
+
+  // ---- Single live cell in the far corner (maxX,maxY). ----------------------
   // Toroidally it is a neighbour of the opposite-corner / opposite-edge cells,
   // reached only through the x-1 / y-1 ("== -1") wrap that breaks on the host.
-  grid->WritePoint(24, 24, 1);
+  grid->WritePoint(maxX, maxY, 1);
 
-  check("neighbors(0,0)   wrap -1,-1",  engine.getNeighborCount(0, 0),  1);
-  check("neighbors(0,24)  wrap -1, 0",  engine.getNeighborCount(0, 24), 1);
-  check("neighbors(24,0)  wrap  0,-1",  engine.getNeighborCount(24, 0), 1);
-  check("neighbors(23,23) no wrap",     engine.getNeighborCount(23, 23), 1);
-  check("neighbors(12,12) far cell",    engine.getNeighborCount(12, 12), 0);
-  check("self (24,24) excludes self",   engine.getNeighborCount(24, 24), 0);
+  check("neighbors(0,0)       wrap -1,-1", engine.getNeighborCount(0, 0),           1);
+  check("neighbors(0,maxY)    wrap -1, 0", engine.getNeighborCount(0, maxY),        1);
+  check("neighbors(maxX,0)    wrap  0,-1", engine.getNeighborCount(maxX, 0),        1);
+  check("neighbors(maxX-1,..) no wrap",    engine.getNeighborCount(maxX - 1, maxY - 1), 1);
+  check("neighbors(midX,midY) far cell",   engine.getNeighborCount(midX, midY),     0);
+  check("self (maxX,maxY) excludes self",  engine.getNeighborCount(maxX, maxY),     0);
 
   // ---- Single live cell at origin (0,0). ------------------------------------
-  // Symmetric check exercising the x+1==25 / y+1==25 wrap from the origin and
-  // confirming the opposite corner sees it.
+  // Symmetric check exercising the x+1 / y+1 wrap from the origin and confirming
+  // the opposite corner sees it.
   grid->Clear();
   grid->WritePoint(0, 0, 1);
 
-  check("neighbors(24,24) wrap +1,+1",  engine.getNeighborCount(24, 24), 1);
-  check("neighbors(24,0)  wrap +1, 0",  engine.getNeighborCount(24, 0), 1);
-  check("neighbors(0,24)  wrap  0,+1",  engine.getNeighborCount(0, 24), 1);
-  check("neighbors(1,1)   no wrap",     engine.getNeighborCount(1, 1),  1);
+  check("neighbors(maxX,maxY) wrap +1,+1", engine.getNeighborCount(maxX, maxY),     1);
+  check("neighbors(maxX,0)    wrap +1, 0", engine.getNeighborCount(maxX, 0),        1);
+  check("neighbors(0,maxY)    wrap  0,+1", engine.getNeighborCount(0, maxY),        1);
+  check("neighbors(1,1)       no wrap",    engine.getNeighborCount(1, 1),           1);
 
   if (g_failures == 0)
   {
