@@ -145,7 +145,7 @@ unsigned short Peggy2ConwayEngine::isAlive(unsigned short currentState, unsigned
   return newState;
 }
 
-unsigned short Peggy2ConwayEngine::getNeighborCount(unsigned short x, unsigned short y)
+unsigned short Peggy2ConwayEngine::getNeighborCount(int x, int y)
 {
   unsigned short count = 0;
 
@@ -163,14 +163,16 @@ unsigned short Peggy2ConwayEngine::getNeighborCount(unsigned short x, unsigned s
   return count;
 }
 
-unsigned short Peggy2ConwayEngine::getCurrentCell(unsigned short x, unsigned short y)
+unsigned short Peggy2ConwayEngine::getCurrentCell(int x, int y)
 {
   ConwayGrid* currentGen = this->genMemory[this->currentGenIndex];
-  
-  if (x == -1) x = 24;
-  if (x == 25) x = 0;
-  if (y == -1) y = 24;
-  if (y == 25) y = 0;
-  
-  return currentGen->GetPoint(x,y);
+
+  // Toroidal wrap with explicit, platform-independent modulo. Using signed
+  // coordinates and (i + N) % N keeps the math correct on both the AVR
+  // (16-bit int) and host compilers (32-bit int); the previous `== -1` test
+  // only wrapped by accident of 16-bit integer promotion (see issue #4).
+  x = (x + COLUMNS) % COLUMNS;
+  y = (y + ROWS) % ROWS;
+
+  return currentGen->GetPoint(x, y);
 }

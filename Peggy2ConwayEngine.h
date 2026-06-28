@@ -32,8 +32,8 @@ class Peggy2ConwayEngine
 		unsigned short genMemorySize;
 
 		unsigned short isAlive(unsigned short currentState, unsigned short neighborCount);
-		unsigned short getNeighborCount(unsigned short x, unsigned short y);
-		unsigned short getCurrentCell(unsigned short x, unsigned short y);
+		unsigned short getNeighborCount(int x, int y);
+		unsigned short getCurrentCell(int x, int y);
 };
 
 #endif
