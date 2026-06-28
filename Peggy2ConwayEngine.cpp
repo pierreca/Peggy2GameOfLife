@@ -1,14 +1,13 @@
 #include <stdlib.h>
-#include <Peggy2Serial.h>
 #include "Peggy2ConwayEngine.h"
 
 Peggy2ConwayEngine::Peggy2ConwayEngine(unsigned short genMemorySize)
 {
   this->genMemorySize = genMemorySize;
-  this->genMemory = (Peggy2 **)malloc(genMemorySize * sizeof(Peggy2 *));
+  this->genMemory = (ConwayGrid **)malloc(genMemorySize * sizeof(ConwayGrid *));
   for (unsigned short i = 0; i < genMemorySize; i++)
   {
-    this->genMemory[i] = new Peggy2();
+    this->genMemory[i] = new ConwayGrid();
   }
 }
 
@@ -43,15 +42,15 @@ void Peggy2ConwayEngine::Initialize(InitFrame initializationType)
   }
 }
 
-Peggy2* Peggy2ConwayEngine::GetCurrentFrame()
+ConwayGrid* Peggy2ConwayEngine::GetCurrentFrame()
 {
   return this->genMemory[this->currentGenIndex];
 }
 
 void Peggy2ConwayEngine::ComputeNextGen()
 {
-  Peggy2* currentGen = this->genMemory[this->currentGenIndex];
-  Peggy2* nextGen = this->genMemory[this->nextGenIndex];
+  ConwayGrid* currentGen = this->genMemory[this->currentGenIndex];
+  ConwayGrid* nextGen = this->genMemory[this->nextGenIndex];
   
   for (int i = 0; i < ROWS; i++)
   {
@@ -71,11 +70,11 @@ void Peggy2ConwayEngine::CommitNextGen()
 
 bool Peggy2ConwayEngine::DetectLoop()
 {
-  Peggy2* nextGen = this->genMemory[this->nextGenIndex];
-  
+  ConwayGrid* nextGen = this->genMemory[this->nextGenIndex];
+
   for (unsigned short i = 0; i < this->genMemorySize; i++)
   {
-    if (i != this->nextGenIndex && this->areIdentical(nextGen, this->genMemory[i]))
+    if (i != this->nextGenIndex && nextGen->Equals(*this->genMemory[i]))
     {
       return true;
     }
@@ -87,7 +86,7 @@ bool Peggy2ConwayEngine::DetectLoop()
 /* Known Initialization sequences */
 void Peggy2ConwayEngine::InitializeRandom()
 {
-  Peggy2* currentGen = this->genMemory[this->currentGenIndex];
+  ConwayGrid* currentGen = this->genMemory[this->currentGenIndex];
   
   for (int i = 0; i < ROWS; i++)
   {
@@ -101,7 +100,7 @@ void Peggy2ConwayEngine::InitializeRandom()
 
 void Peggy2ConwayEngine::InitializeGlider()
 {
-  Peggy2* currentGen = this->genMemory[this->currentGenIndex];
+  ConwayGrid* currentGen = this->genMemory[this->currentGenIndex];
   currentGen->Clear();
   currentGen->WritePoint(0,0,1);
   currentGen->WritePoint(2,0,1);
@@ -112,7 +111,7 @@ void Peggy2ConwayEngine::InitializeGlider()
 
 void Peggy2ConwayEngine::InitializeRPentomino()
 {
-  Peggy2* currentGen = this->genMemory[this->currentGenIndex];
+  ConwayGrid* currentGen = this->genMemory[this->currentGenIndex];
   currentGen->Clear();
   currentGen->WritePoint(12,11,1);
   currentGen->WritePoint(13,11,1);
@@ -123,7 +122,7 @@ void Peggy2ConwayEngine::InitializeRPentomino()
 
 void Peggy2ConwayEngine::InitializeBlinker()
 {
-  Peggy2* currentGen = this->genMemory[this->currentGenIndex];
+  ConwayGrid* currentGen = this->genMemory[this->currentGenIndex];
   currentGen->Clear();
   currentGen->WritePoint(12,11,1);
   currentGen->WritePoint(13,11,1);
@@ -149,7 +148,6 @@ unsigned short Peggy2ConwayEngine::isAlive(unsigned short currentState, unsigned
 unsigned short Peggy2ConwayEngine::getNeighborCount(unsigned short x, unsigned short y)
 {
   unsigned short count = 0;
-  Peggy2* currentGen = this->genMemory[this->currentGenIndex];
 
   count += this->getCurrentCell(x - 1, y - 1);
   count += this->getCurrentCell(x, y - 1);
@@ -167,7 +165,7 @@ unsigned short Peggy2ConwayEngine::getNeighborCount(unsigned short x, unsigned s
 
 unsigned short Peggy2ConwayEngine::getCurrentCell(unsigned short x, unsigned short y)
 {
-  Peggy2* currentGen = this->genMemory[this->currentGenIndex];
+  ConwayGrid* currentGen = this->genMemory[this->currentGenIndex];
   
   if (x == -1) x = 24;
   if (x == 25) x = 0;
@@ -175,17 +173,4 @@ unsigned short Peggy2ConwayEngine::getCurrentCell(unsigned short x, unsigned sho
   if (y == 25) y = 0;
   
   return currentGen->GetPoint(x,y);
-}
-
-bool Peggy2ConwayEngine::areIdentical(Peggy2 *gen1, Peggy2 *gen2)
-{
-  for(int i = 0; i < 25; i++)
-	{
-		if (gen1->buffer[i] != gen2->buffer[i])
-		{
-			return false;
-		}
-	}
-	
-	return true;
 }

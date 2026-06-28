@@ -1,0 +1,4 @@
+smoke_test
+smoke_test_*
+*.o
+*.dSYM/

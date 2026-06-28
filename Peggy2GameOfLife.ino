@@ -46,7 +46,7 @@ void GameOfLifeStep()
 
 void ShowCounterScreen(int timeInSeconds)
 {
-  Peggy2 *currentGen = peggy2ConwayEngine->GetCurrentFrame();
+  Peggy2 *currentGen = peggy2ConwayEngine->GetCurrentFrame()->Device();
   currentGen->Clear();
   char stepCountText[5];
   char maxStepCountText[5];
