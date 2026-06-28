@@ -2,9 +2,10 @@
 // allocate fresh heap memory on every call (the original code malloc'd a string
 // per call and never freed it, leaking on the AVR's tiny SRAM).
 //
-// Build (see test/run.sh):
-//   clang++ -c StepCounter.cpp -include test/host_compat.h -o stepcounter.o
-//   clang++ test/test_step_counter.cpp stepcounter.o -o runner
+// Build (see test/run_step_counter.sh):
+//   clang++ -std=c++17 -Wall -c StepCounter.cpp -include test/host_compat.h -o test/stepcounter.o
+//   clang++ -std=c++17 -Wall test/test_step_counter.cpp test/stepcounter.o -o test/runner
+//   ./test/runner
 //
 // The counting malloc wrapper lives in host_compat.h and is only spliced into
 // StepCounter.cpp, so g_counterMallocCount reflects allocations made by the
