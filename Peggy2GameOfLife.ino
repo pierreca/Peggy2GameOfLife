@@ -1,6 +1,7 @@
 // Game of life for Peggy 2.0
 // Pierre Cauchois
 // 10/10/2015
+#include <stdlib.h>
 #include <Peggy2Serial.h>
 #include <PeggyWriter.h>
 #include <SimpleTimer.h>
@@ -16,13 +17,22 @@ Peggy2ConwayEngine* peggy2ConwayEngine;
 PeggyWriter StepCountWriter;
 bool displayStepCounter = false;
 
+// Seed the same generator that InitializeRandom() draws from (stdlib rand()),
+// from a genuinely varying source so each power-on starts differently. An
+// unconnected analog pin reads electrical noise, which beats millis() (~0 at
+// startup). Must run before the first random frame is generated.
+void SeedRandom()
+{
+  srand(analogRead(0));
+}
+
 void GameOfLifeStep()
 {
   if (displayStepCounter)
   {
     ShowCounterScreen(10);
     stepCounter.ResetCurrentCount();
-    randomSeed(millis());
+    SeedRandom();
     peggy2ConwayEngine->Initialize(Random);
     stepCounter.IncrementCount();
     
@@ -67,6 +77,7 @@ void ShowCounterScreen(int timeInSeconds)
 void setup()
 {
   peggy2ConwayEngine = new Peggy2ConwayEngine(4);
+  SeedRandom();
   peggy2ConwayEngine->Initialize(Random);
   stepCounter.IncrementCount();
   
