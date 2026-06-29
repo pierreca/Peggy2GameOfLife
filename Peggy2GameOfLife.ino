@@ -12,7 +12,7 @@
 
 SimpleTimer timer;
 StepCounter stepCounter;
-ConwayEngine* peggy2ConwayEngine;
+ConwayEngine* conwayEngine;
 
 PeggyWriter StepCountWriter;
 bool displayStepCounter = false;
@@ -33,22 +33,22 @@ void GameOfLifeStep()
     ShowCounterScreen(10);
     stepCounter.ResetCurrentCount();
     SeedRandom();
-    peggy2ConwayEngine->Initialize(Random);
+    conwayEngine->Initialize(Random);
     stepCounter.IncrementCount();
     
     displayStepCounter = false;
   }
   else
   {
-    peggy2ConwayEngine->ComputeNextGen();
+    conwayEngine->ComputeNextGen();
     
-    if (peggy2ConwayEngine->DetectLoop())
+    if (conwayEngine->DetectLoop())
     {
       displayStepCounter = true;
     }
     else
     {
-      peggy2ConwayEngine->CommitNextGen();
+      conwayEngine->CommitNextGen();
       stepCounter.IncrementCount();
     }
   }
@@ -56,7 +56,7 @@ void GameOfLifeStep()
 
 void ShowCounterScreen(int timeInSeconds)
 {
-  Peggy2 *currentGen = peggy2ConwayEngine->GetCurrentFrame()->Device();
+  Peggy2 *currentGen = conwayEngine->GetCurrentFrame()->Device();
   currentGen->Clear();
   char stepCountText[5];
   char maxStepCountText[5];
@@ -76,9 +76,9 @@ void ShowCounterScreen(int timeInSeconds)
 
 void setup()
 {
-  peggy2ConwayEngine = new ConwayEngine(4);
+  conwayEngine = new ConwayEngine(4);
   SeedRandom();
-  peggy2ConwayEngine->Initialize(Random);
+  conwayEngine->Initialize(Random);
   stepCounter.IncrementCount();
   
   displayStepCounter = false;
@@ -88,5 +88,5 @@ void setup()
 void loop()
 {
   timer.run();
-  peggy2ConwayEngine->GetCurrentFrame()->RefreshAll(1);
+  conwayEngine->GetCurrentFrame()->RefreshAll(1);
 }
