@@ -187,6 +187,48 @@ static void test_detectloop_evolving()
   }
 }
 
+// Steps until DetectLoop fires (returns the generation at which it fired) or
+// returns -1 if it never fired within maxGen generations.
+static int stepUntilLoop(ConwayEngine& e, int maxGen)
+{
+  for (int gen = 1; gen <= maxGen; gen++)
+  {
+    e.ComputeNextGen();
+    if (e.DetectLoop()) return gen;
+    e.CommitNextGen();
+  }
+  return -1;
+}
+
+// A glider translates by (1,1) every 4 generations, so on the 25x25 torus it
+// returns to its exact starting configuration after 25*4 = 100 generations.
+// With a loop-detection history deeper than that period, DetectLoop catches the
+// recurrence -- a far longer period than the old 4-frame ring could ever see.
+static void test_detectloop_long_period_deep_history()
+{
+  printf("test_detectloop_long_period_deep_history\n");
+  ConwayEngine e(128);            // history deeper than the glider's torus period
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kGlider);
+
+  int firedAt = stepUntilLoop(e, 150);
+  check(firedAt == 100, "deep history catches the glider's period-100 torus recurrence");
+}
+
+// The same glider with a shallow history (like the original 4-frame ring) never
+// recurs within the window, so DetectLoop must stay quiet: a watchdog, not loop
+// detection, is what eventually reseeds such long-period patterns.
+static void test_detectloop_long_period_shallow_misses()
+{
+  printf("test_detectloop_long_period_shallow_misses\n");
+  ConwayEngine e(4);
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kGlider);
+
+  int firedAt = stepUntilLoop(e, 150);
+  check(firedAt == -1, "shallow history never falsely fires on a long-period glider");
+}
+
 int main()
 {
   test_blinker_period2();
@@ -196,6 +238,8 @@ int main()
   test_detectloop_still_life();
   test_detectloop_oscillator();
   test_detectloop_evolving();
+  test_detectloop_long_period_deep_history();
+  test_detectloop_long_period_shallow_misses();
 
   printf("\n%d checks, %d failures\n", g_checks, g_failures);
   if (g_failures == 0) printf("ALL TESTS PASSED\n");

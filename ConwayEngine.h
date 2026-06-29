@@ -1,6 +1,7 @@
 #ifndef CONWAYENGINE_H
 #define CONWAYENGINE_H
 
+#include <stdint.h>
 #include "ConwayGrid.h"
 
 typedef enum InitFrame
@@ -14,7 +15,14 @@ typedef enum InitFrame
 class ConwayEngine
 {
 	public:
-		ConwayEngine(unsigned short genMemorySize);
+		// loopHistorySize is how many recent generations are remembered for loop
+		// detection. History is stored as compact per-generation hashes (not full
+		// frames), so a deep window is cheap: it catches longer-period oscillators
+		// than the old 4-frame ring could. The trade-off is a ~2^-32 chance that a
+		// hash collision reports a loop one generation early, which for an
+		// autonomous display only means an occasional slightly-early reseed.
+		ConwayEngine(unsigned short loopHistorySize);
+		~ConwayEngine();
 		void Initialize(InitFrame initializationType);
 		void ComputeNextGen();
 		void CommitNextGen();
@@ -26,10 +34,23 @@ class ConwayEngine
 		void InitializeRPentomino();
 		void InitializeGlider();
 	private:
+		// Two frames are enough: one displayed (current) while the next is computed
+		// (double buffering). Loop-detection history lives in loopHashes, not here.
+		static const unsigned short frameCount = 2;
 		unsigned short currentGenIndex;
 		unsigned short nextGenIndex;
 		ConwayGrid** genMemory;
-		unsigned short genMemorySize;
+
+		// Circular buffer of the most recent generation hashes (capacity
+		// loopHistorySize). loopHashCount valid entries; loopHashHead is the next
+		// write slot.
+		uint32_t* loopHashes;
+		unsigned short loopHistorySize;
+		unsigned short loopHashCount;
+		unsigned short loopHashHead;
+
+		uint32_t hashFrame(ConwayGrid* frame);
+		void recordHash(uint32_t hash);
 
 		unsigned short isAlive(unsigned short currentState, unsigned short neighborCount);
 		unsigned short getNeighborCount(int x, int y);

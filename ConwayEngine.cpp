@@ -1,27 +1,42 @@
 #include <stdlib.h>
 #include "ConwayEngine.h"
 
-ConwayEngine::ConwayEngine(unsigned short genMemorySize)
+ConwayEngine::ConwayEngine(unsigned short loopHistorySize)
 {
-  this->genMemorySize = genMemorySize;
-  this->genMemory = new ConwayGrid*[genMemorySize];
-  for (unsigned short i = 0; i < genMemorySize; i++)
+  this->loopHistorySize = loopHistorySize;
+  this->loopHashes = new uint32_t[loopHistorySize];
+  this->loopHashCount = 0;
+  this->loopHashHead = 0;
+
+  this->genMemory = new ConwayGrid*[frameCount];
+  for (unsigned short i = 0; i < frameCount; i++)
   {
     this->genMemory[i] = new ConwayGrid();
   }
+}
+
+ConwayEngine::~ConwayEngine()
+{
+  for (unsigned short i = 0; i < frameCount; i++)
+  {
+    delete this->genMemory[i];
+  }
+  delete[] this->genMemory;
+  delete[] this->loopHashes;
 }
 
 void ConwayEngine::Initialize(InitFrame initializationType)
 {
   this->currentGenIndex = 0;
   this->nextGenIndex = 1;
+
+  // A fresh run shares no loop-detection history with the previous one.
+  this->loopHashCount = 0;
+  this->loopHashHead = 0;
+
   this->genMemory[this->currentGenIndex]->HardwareInit();
-  
-  for (int i = 1; i < this->genMemorySize; i++)
-  {
-    this->genMemory[i]->Clear();
-  }
-  
+  this->genMemory[this->nextGenIndex]->Clear();
+
   switch(initializationType)
   {
     case Random:
@@ -51,7 +66,13 @@ void ConwayEngine::ComputeNextGen()
 {
   ConwayGrid* currentGen = this->genMemory[this->currentGenIndex];
   ConwayGrid* nextGen = this->genMemory[this->nextGenIndex];
-  
+
+  // Remember the current generation so DetectLoop can later recognise a return
+  // to it (or to any recent generation). Recorded here, right before computing
+  // the next frame, so a frame seeded directly into the current buffer (e.g. by
+  // a test or a non-random Initialize) is captured too.
+  this->recordHash(this->hashFrame(currentGen));
+
   for (int i = 0; i < ROWS; i++)
   {
     for (int j = 0; j < COLUMNS; j++)
@@ -69,25 +90,62 @@ void ConwayEngine::ComputeNextGen()
   }
 }
 
-void ConwayEngine::CommitNextGen() 
+void ConwayEngine::CommitNextGen()
 {
-  this->currentGenIndex = (this->currentGenIndex + 1) % this->genMemorySize;
-  this->nextGenIndex = (this->nextGenIndex + 1) % this->genMemorySize;
+  this->currentGenIndex = (this->currentGenIndex + 1) % frameCount;
+  this->nextGenIndex = (this->nextGenIndex + 1) % frameCount;
 }
 
 bool ConwayEngine::DetectLoop()
 {
-  ConwayGrid* nextGen = this->genMemory[this->nextGenIndex];
+  // The just-computed next generation loops the simulation if its state matches
+  // any recent generation. Compare hashes rather than full frames so the history
+  // can stay deep cheaply (see the header note on the collision trade-off).
+  uint32_t candidate = this->hashFrame(this->genMemory[this->nextGenIndex]);
 
-  for (unsigned short i = 0; i < this->genMemorySize; i++)
+  for (unsigned short i = 0; i < this->loopHashCount; i++)
   {
-    if (i != this->nextGenIndex && nextGen->Equals(*this->genMemory[i]))
+    if (this->loopHashes[i] == candidate)
     {
       return true;
     }
   }
-  
+
   return false;
+}
+
+// FNV-1a over the frame's cells, packed one row at a time. COLUMNS <= 32 so each
+// row fits in the 32-bit accumulator; the result is identical on the 16-bit-int
+// AVR and a 32-bit-int host because uint32_t arithmetic is fixed width.
+uint32_t ConwayEngine::hashFrame(ConwayGrid* frame)
+{
+  uint32_t hash = 2166136261u; // FNV-1a offset basis
+  for (int y = 0; y < ROWS; y++)
+  {
+    uint32_t row = 0;
+    for (int x = 0; x < COLUMNS; x++)
+    {
+      row = (row << 1) | (frame->GetPoint(x, y) ? 1u : 0u);
+    }
+    for (int b = 0; b < 4; b++)
+    {
+      hash ^= (row >> (b * 8)) & 0xFFu;
+      hash *= 16777619u; // FNV-1a prime
+    }
+  }
+  return hash;
+}
+
+// Push a generation hash into the circular history, dropping the oldest once the
+// window is full.
+void ConwayEngine::recordHash(uint32_t hash)
+{
+  this->loopHashes[this->loopHashHead] = hash;
+  this->loopHashHead = (this->loopHashHead + 1) % this->loopHistorySize;
+  if (this->loopHashCount < this->loopHistorySize)
+  {
+    this->loopHashCount++;
+  }
 }
 
 /* Known Initialization sequences */

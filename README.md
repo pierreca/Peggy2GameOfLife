@@ -4,7 +4,7 @@ This small project is a naive implementation of [Conway's Game of Life](https://
 
 # How it works
 The algorithm starts as soon as the Peggy 2 board is powered. On startup it seeds the random number generator from electrical noise on an unconnected analog pin (so each power-on differs), randomly initializes the first frame, then runs Conway's rules on each cell.
-There is a simplistic loop detection that will stop the iterations if it detects that the life-form is stuck in a basic loop (we'll get back to that).
+A loop detector stops the iterations when it detects that the life-form has returned to an earlier state — i.e. it's stuck in a repeating cycle (we'll get back to that).
 Once it stops, it will display how many steps were taken to get there, as well as the maximum number of steps ever reached since the Peggy board has been powered on, then reseed and start over.
 
 # Building and running
@@ -56,14 +56,14 @@ the cell at (0,0) is considered neighbors with (0,1), (1,1), (1,0) as well as (2
 This should be made an optional parameter as it helps creating undetectable loops.
 
 ## How to detect when to stop
-The rules engine keeps in memory a specific number of old frames (it's a parameter of the engine). At each iteration, it compares a frame with the old frames in memory: if it finds 2 frames are identical, which means we're stuck in a loop, it stops.
+The rules engine remembers a compact 32-bit *hash* of each recent generation (the history depth is a parameter of the engine). At each iteration it hashes the new frame and compares it against the remembered hashes: a match means the simulation has returned to an earlier state — i.e. it's stuck in a loop — so it stops.
 
-I've found that 4 is a good number to detect the most common forms of oscillators without slowing down the display of each step. It will not detect spaceships and oscillators with a period larger than what is specified when initializing the rules engine though.
+Storing a hash instead of a whole frame makes a deep history cheap, so the engine catches much longer oscillator periods than the original 4-frame design: the firmware keeps 32 generations and the host emulator 128 — enough to catch, for example, a glider's 100-generation recurrence as it wraps around the toroidal grid. The cost is a roughly 2⁻³² chance that a hash collision ends a run one generation early, which for an autonomous display just means an occasional slightly-early reseed.
 
-There are other things we could do:
-* detect an unusally large number of steps (arbitrary)
+It still won't catch periods longer than the history window. The remaining ideas:
+* detect an unusually large number of steps (a max-generation watchdog — issue #8)
+* treat a long stretch of unchanged live-cell population as "stuck" (the open second half of issue #9)
 * actively scan for gliders (computationally very expensive)
-* store more frames (25 would be enough because of the infinite canvas logic, but expensive memory-wise)
 * Renounce the infinite canvas logic (and consider all cells outside of the matrix are dead). the glider would eventually exit.
 
 ## Stepping speed

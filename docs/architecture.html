@@ -74,8 +74,9 @@
   <p>
     The project is an Arduino sketch that runs Conway's Game of Life on a Peggy 2.0 board — a 25×25
     monochrome, multiplexed LED matrix. On power-up it seeds the RNG from analog-pin noise, fills a
-    random first frame, then advances Conway's rules each step. When it detects a short oscillation
-    loop it briefly shows the step count, reseeds, and repeats — so it runs autonomously forever.
+    random first frame, then advances Conway's rules each step. When it detects that the field has
+    looped back to an earlier state it briefly shows the step count, reseeds, and repeats — so it runs
+    autonomously forever.
   </p>
   <p>
     The defining architectural property is that the <strong>simulation engine is fully decoupled from
@@ -97,7 +98,7 @@
 
   INO --&gt; ENG
   INO --&gt; SC
-  ENG -- "get/set cells, Equals" --&gt; CG
+  ENG -- "get/set cells" --&gt; CG
   CG -- "default build" --&gt; PG
   CG -- "-DCONWAY_HOST_BUILD" --&gt; HG
   PG --&gt; HW
@@ -120,10 +121,10 @@
       (<a href="https://github.com/pierreca/Peggy2GameOfLife/issues/29">issue #29</a>).
     </aside>
     <ul class="kvs">
-      <li><b>State</b> a ring of <code>genMemorySize</code> <code>ConwayGrid</code> frames, plus <code>currentGenIndex</code> / <code>nextGenIndex</code> (constructed with <code>4</code> in the sketch).</li>
-      <li><b>ComputeNextGen()</b> writes the next generation into the next frame; reads the current frame through the grid interface.</li>
-      <li><b>CommitNextGen()</b> advances the ring indices (modulo <code>genMemorySize</code>).</li>
-      <li><b>DetectLoop()</b> compares the just-computed frame against the others via <code>ConwayGrid::Equals</code>.</li>
+      <li><b>State</b> two double-buffered <code>ConwayGrid</code> frames (<code>currentGenIndex</code> / <code>nextGenIndex</code>), plus a ring of compact 32-bit generation hashes (<code>loopHashes</code>, capacity <code>loopHistorySize</code> — 32 in the sketch, 128 in the emulator) for loop detection.</li>
+      <li><b>ComputeNextGen()</b> records the current generation's hash (<code>hashFrame</code>, FNV-1a over the cells), then writes the next generation into the next frame; reads the current frame through the grid interface.</li>
+      <li><b>CommitNextGen()</b> swaps the two frame indices (modulo <code>frameCount</code> = 2).</li>
+      <li><b>DetectLoop()</b> hashes the just-computed frame and reports a loop if it matches any recent generation's hash (no full-frame comparison).</li>
       <li><b>Rule</b> (<code>isAlive</code>): survives on 2 live neighbours, born on 3, dead otherwise.</li>
       <li><b>Neighbours</b> (<code>getNeighborCount</code>/<code>getCurrentCell</code>): 8-neighbourhood with toroidal wrap (see <a href="#decisions-wrap">decisions</a>).</li>
     </ul>
@@ -246,12 +247,18 @@
   </section>
 
   <section id="decisions-detection" data-decision="loop-detection">
-    <h3>Loop detection bounded by ring size</h3>
+    <h3>Hash-based loop detection over a deep history</h3>
     <p>
-      Termination is detected by comparing each new frame against the few previous frames held in the
-      ring (4). This catches still-lifes and short oscillators but not spaceships/gliders (which keep
-      translating on the torus) or long-period oscillators. A max-generation watchdog and a cheaper
-      hash-based history are tracked as open enhancements.
+      Termination is detected by hashing each new generation (FNV-1a over the cells) and comparing it
+      against a ring of recent generation hashes. Storing a 32-bit hash instead of a whole frame makes a
+      deep window cheap, so the sketch remembers 32 generations and the emulator 128 — enough to catch
+      long-period recurrences the original 4-frame ring missed, such as a glider's 100-generation lap
+      around the torus. The trade-off is a ~2<sup>-32</sup> chance a hash collision ends a run one
+      generation early, which for an autonomous display only means an occasional slightly-early reseed.
+      Periods longer than the window still slip through; the max-generation watchdog
+      (<a href="https://github.com/pierreca/Peggy2GameOfLife/issues/8">#8</a>) is the backstop, and
+      population-stagnation detection (the open second half of
+      <a href="https://github.com/pierreca/Peggy2GameOfLife/issues/9">#9</a>) is still to come.
     </p>
   </section>
 
@@ -280,10 +287,10 @@
       <tr><td>Host test harness + engine decoupling</td><td>done (PR stack)</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/5">#5</a></td></tr>
       <tr><td>Engine unit tests; platform-independent wrap; leak/overflow/RNG/cleanup fixes</td><td>done (PR stack)</td><td>#6, #4, #1, #3, #7</td></tr>
       <tr><td>Max-generation watchdog (gliders never freeze the display)</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/8">#8</a></td></tr>
-      <tr><td>Better termination detection (hash ring + population stagnation)</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/9">#9</a></td></tr>
+      <tr><td>Better termination detection: hash ring done; population stagnation pending</td><td>partial</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/9">#9</a></td></tr>
       <tr><td>Configurable edge topology (toroidal vs. dead border)</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/10">#10</a></td></tr>
       <tr><td>Route remaining magic numbers through ROWS/COLUMNS</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/11">#11</a></td></tr>
-      <tr><td>Local terminal emulator/visualizer</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/27">#27</a></td></tr>
+      <tr><td>Local terminal emulator/visualizer</td><td>done</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/27">#27</a></td></tr>
     </tbody>
   </table>
   <aside>
