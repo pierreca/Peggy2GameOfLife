@@ -15,6 +15,17 @@ You will need the **Peggy2Serial** and **SimpleTimer** libraries in your Arduino
 ## On your computer (no hardware needed)
 The simulation engine is decoupled from the Peggy 2 hardware (see [Architecture](#architecture)), so the Conway logic compiles and runs on a normal machine with nothing more than a C++ compiler (clang or gcc) and `make` — no Arduino toolchain, no Peggy2Serial. This is what the tests use.
 
+### Watch it run in your terminal
+A small host-only visualizer runs the **real** engine against `HostGrid` and renders the 25×25 grid to the terminal, one generation at a time. It mirrors the sketch's main loop (seed → step → loop-detect → step-counter screen → reseed), so you can watch patterns evolve without flashing the board:
+
+```
+make -C emulator run                              # random seed, watchable speed
+./emulator/emulator --pattern glider --max-gen 60  # gliders translate forever; reseed after 60 gens
+./emulator/emulator --pattern blinker --seed 1 --once   # reproducible; stop at the first loop
+```
+
+Flags: `--pattern <random|blinker|glider|rpentomino>`, `--delay <ms>`, `--seed <n>` (reproducible run), `--max-gen <n>` (reseed even without a loop), `--once`. Ctrl-C exits cleanly. It cannot reproduce display **flicker** — that is a hardware multiplex / persistence-of-vision property (`RefreshAll` is a no-op on the host).
+
 # Running the tests
 All tests are self-contained host C++ — no hardware, no third-party libraries. From the repo root:
 
