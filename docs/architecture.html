@@ -113,6 +113,12 @@
   <section id="components-engine">
     <h3>Peggy2ConwayEngine <span class="badge">core</span></h3>
     <p>Files: <code>Peggy2ConwayEngine.h</code> / <code>.cpp</code>. The simulation itself, with no hardware knowledge.</p>
+    <aside data-kind="naming-note">
+      <strong>Naming.</strong> Despite the <code>Peggy2</code> prefix, this class has no hardware
+      dependency since the <code>ConwayGrid</code> decoupling — the name is a historical artifact. A
+      rename to <code>ConwayEngine</code> is tracked in
+      <a href="https://github.com/pierreca/Peggy2GameOfLife/issues/29">issue #29</a>.
+    </aside>
     <ul class="kvs">
       <li><b>State</b> a ring of <code>genMemorySize</code> <code>ConwayGrid</code> frames, plus <code>currentGenIndex</code> / <code>nextGenIndex</code> (constructed with <code>4</code> in the sketch).</li>
       <li><b>ComputeNextGen()</b> writes the next generation into the next frame; reads the current frame through the grid interface.</li>
