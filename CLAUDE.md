@@ -21,6 +21,8 @@ There is no single command-line build for the firmware. There are two distinct b
 - `sh test/run_step_counter.sh` — StepCounter heap-leak regression.
 - `c++ -std=c++11 -Wall tests/rng_seed_test.cpp -o /tmp/rng && /tmp/rng` — RNG seeding.
 
+There is also a host-only **terminal visualizer** in `emulator/` (`make -C emulator run`; flags `--pattern`/`--delay`/`--seed`/`--max-gen`/`--once`). It runs the real engine against `HostGrid` and renders each generation to the terminal, mirroring the sketch's main loop (seed → step → `DetectLoop` → counter screen → reseed). It reuses `StepCounter.cpp` verbatim, supplying AVR's `utoa` via a force-included `emulator/host_shim.h`. It cannot reproduce hardware flicker (`RefreshAll` is a host no-op).
+
 Note: in some sandboxed environments the AddressSanitizer runtime hangs at startup; the suites are designed to also pass under UBSan / plain builds, which carry the same assertions.
 
 ## Architecture
