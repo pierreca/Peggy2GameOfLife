@@ -1,6 +1,6 @@
 // Host smoke test for the Conway engine.
 //
-// This compiles the real Peggy2ConwayEngine against the in-memory HostGrid
+// This compiles the real ConwayEngine against the in-memory HostGrid
 // (no Arduino toolchain, no Peggy2Serial) and checks that the engine actually
 // advances a generation. The classic test is a "blinker": a horizontal row of
 // three live cells that must become a vertical column of three after one step.
@@ -8,7 +8,7 @@
 // Build & run:  make -C host test   (or: cd host && make test)
 
 #include <cstdio>
-#include "Peggy2ConwayEngine.h"
+#include "ConwayEngine.h"
 
 static int failures = 0;
 
@@ -26,7 +26,7 @@ int main()
   printf("Conway engine host smoke test\n");
 
   // 4 generations of memory, matching the sketch.
-  Peggy2ConwayEngine engine(4);
+  ConwayEngine engine(4);
   engine.Initialize(Blinker);
 
   // The blinker seed: three horizontal cells at row 11, columns 12..14.

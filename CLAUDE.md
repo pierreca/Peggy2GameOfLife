@@ -31,7 +31,7 @@ The engine is **decoupled from the display hardware** behind a zero-cost grid ab
   - `Peggy2Grid` (`Peggy2Grid.h`) — inlined wrapper over a real `Peggy2` framebuffer (on-device).
   - `HostGrid` (`host/HostGrid.h`) — in-memory bitmap with no Arduino dependency (host builds, selected by `-DCONWAY_HOST_BUILD`).
   The engine only ever refers to `ConwayGrid`; it never includes `Peggy2Serial.h` directly. Grid dimensions live in `GridDimensions.h` (`ROWS`/`COLUMNS`, 25×25).
-- **`Peggy2ConwayEngine`** (`.h`/`.cpp`) — the simulation. Owns a ring of `genMemorySize` `ConwayGrid` frames; tracks `currentGenIndex`/`nextGenIndex`. `ComputeNextGen()` writes the next state into the next frame, `CommitNextGen()` advances the ring, `DetectLoop()` compares the just-computed frame against the others via `ConwayGrid::Equals`.
+- **`ConwayEngine`** (`.h`/`.cpp`) — the simulation. Owns a ring of `genMemorySize` `ConwayGrid` frames; tracks `currentGenIndex`/`nextGenIndex`. `ComputeNextGen()` writes the next state into the next frame, `CommitNextGen()` advances the ring, `DetectLoop()` compares the just-computed frame against the others via `ConwayGrid::Equals`.
 - **`Peggy2GameOfLife.ino`** — orchestrator. A `SimpleTimer` fires `GameOfLifeStep()` every `STEP_PERIOD_MS` (500ms); `loop()` runs the timer and continuously refreshes the current frame. The sketch reaches Peggy-specific display helpers (`Line`, `PeggyWriter`) via `GetCurrentFrame()->Device()`.
 - **`StepCounter`** (`.h`/`.cpp`) — current-run and all-time-max step counts. `counterToString` fills caller-owned fixed buffers (no per-call heap allocation).
 

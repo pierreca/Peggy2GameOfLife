@@ -29,7 +29,7 @@ All tests are self-contained host C++ — no hardware, no third-party libraries.
 Some suites can also build under AddressSanitizer (`sh test/run.sh`, `make -C test test-asan`). If the ASan runtime misbehaves in your environment, the default UndefinedBehaviorSanitizer / plain builds carry the same assertions, so the suites still verify correctly without it.
 
 # Architecture
-The simulation engine (`Peggy2ConwayEngine`) is independent of the display hardware. It talks to a thin `ConwayGrid` abstraction — a compile-time typedef (no virtual dispatch, no per-cell cost) — that resolves to one of two backends:
+The simulation engine (`ConwayEngine`) is independent of the display hardware. It talks to a thin `ConwayGrid` abstraction — a compile-time typedef (no virtual dispatch, no per-cell cost) — that resolves to one of two backends:
 
 - **`Peggy2Grid`** — a fully-inlined wrapper around a real Peggy 2 framebuffer, used on-device.
 - **`HostGrid`** — a plain in-memory bitmap with no Arduino dependency, used for host builds and tests (selected with `-DCONWAY_HOST_BUILD`).

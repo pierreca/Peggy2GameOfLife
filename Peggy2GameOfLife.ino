@@ -6,13 +6,13 @@
 #include <PeggyWriter.h>
 #include <SimpleTimer.h>
 #include "StepCounter.h"
-#include "Peggy2ConwayEngine.h"
+#include "ConwayEngine.h"
 
 #define STEP_PERIOD_MS 500
 
 SimpleTimer timer;
 StepCounter stepCounter;
-Peggy2ConwayEngine* peggy2ConwayEngine;
+ConwayEngine* peggy2ConwayEngine;
 
 PeggyWriter StepCountWriter;
 bool displayStepCounter = false;
@@ -76,7 +76,7 @@ void ShowCounterScreen(int timeInSeconds)
 
 void setup()
 {
-  peggy2ConwayEngine = new Peggy2ConwayEngine(4);
+  peggy2ConwayEngine = new ConwayEngine(4);
   SeedRandom();
   peggy2ConwayEngine->Initialize(Random);
   stepCounter.IncrementCount();

@@ -11,12 +11,12 @@ CXX ?= c++
 CXXFLAGS ?= -std=c++11 -Wall -Wextra -O2
 CPPFLAGS += -DCONWAY_HOST_BUILD -I. -I..
 
-SRCS := smoke_test.cpp ../Peggy2ConwayEngine.cpp
+SRCS := smoke_test.cpp ../ConwayEngine.cpp
 BIN := smoke_test
 
 .PHONY: test clean
 
-$(BIN): $(SRCS) HostGrid.h ../ConwayGrid.h ../GridDimensions.h ../Peggy2ConwayEngine.h
+$(BIN): $(SRCS) HostGrid.h ../ConwayGrid.h ../GridDimensions.h ../ConwayEngine.h
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(SRCS) -o $(BIN)
 
 test: $(BIN)

@@ -87,7 +87,7 @@
   <figure class="mermaid-fig" id="diagram-architecture" data-kind="diagram">
     <pre class="mermaid">flowchart TB
   INO["Peggy2GameOfLife.ino — SimpleTimer orchestrator"]
-  ENG["Peggy2ConwayEngine — rules, ring buffer, loop detection"]
+  ENG["ConwayEngine — rules, ring buffer, loop detection"]
   SC["StepCounter — step counts"]
   CG{{"ConwayGrid — compile-time typedef"}}
   PG["Peggy2Grid — on-device wrapper"]
@@ -111,13 +111,13 @@
   <h2>Components</h2>
 
   <section id="components-engine">
-    <h3>Peggy2ConwayEngine <span class="badge">core</span></h3>
-    <p>Files: <code>Peggy2ConwayEngine.h</code> / <code>.cpp</code>. The simulation itself, with no hardware knowledge.</p>
+    <h3>ConwayEngine <span class="badge">core</span></h3>
+    <p>Files: <code>ConwayEngine.h</code> / <code>.cpp</code>. The simulation itself, with no hardware knowledge.</p>
     <aside data-kind="naming-note">
-      <strong>Naming.</strong> Despite the <code>Peggy2</code> prefix, this class has no hardware
-      dependency since the <code>ConwayGrid</code> decoupling — the name is a historical artifact. A
-      rename to <code>ConwayEngine</code> is tracked in
-      <a href="https://github.com/pierreca/Peggy2GameOfLife/issues/29">issue #29</a>.
+      <strong>Naming.</strong> Renamed from <code>Peggy2ConwayEngine</code> — despite the old
+      <code>Peggy2</code> prefix, the class has no hardware dependency (it talks only to
+      <code>ConwayGrid</code>), so the misleading prefix was dropped
+      (<a href="https://github.com/pierreca/Peggy2GameOfLife/issues/29">issue #29</a>).
     </aside>
     <ul class="kvs">
       <li><b>State</b> a ring of <code>genMemorySize</code> <code>ConwayGrid</code> frames, plus <code>currentGenIndex</code> / <code>nextGenIndex</code> (constructed with <code>4</code> in the sketch).</li>

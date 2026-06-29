@@ -24,12 +24,12 @@ RUNENV   ?=
 DEFINES  := -DCONWAY_HOST_BUILD
 INCLUDES := -I.. -I../host
 
-ENGINE   := ../Peggy2ConwayEngine.cpp
+ENGINE   := ../ConwayEngine.cpp
 TESTS    := conway_tests.cpp
 # Every header that affects the host build, so edits to any of them force a
 # rebuild: ConwayGrid.h selects HostGrid vs Peggy2Grid, GridDimensions.h defines
 # ROWS/COLUMNS, HostGrid.h is the host implementation.
-DEPS     := $(TESTS) $(ENGINE) ../Peggy2ConwayEngine.h ../ConwayGrid.h \
+DEPS     := $(TESTS) $(ENGINE) ../ConwayEngine.h ../ConwayGrid.h \
             ../GridDimensions.h ../host/HostGrid.h
 BIN      := conway_tests
 

@@ -1,5 +1,5 @@
-#ifndef __PEGGY2CONWAYENGINE_H__
-#define __PEGGY2CONWAYENGINE_H__
+#ifndef CONWAYENGINE_H
+#define CONWAYENGINE_H
 
 #include "ConwayGrid.h"
 
@@ -11,10 +11,10 @@ typedef enum InitFrame
 	Glider
 } InitFrame;
 
-class Peggy2ConwayEngine
+class ConwayEngine
 {
 	public:
-		Peggy2ConwayEngine(unsigned short genMemorySize);
+		ConwayEngine(unsigned short genMemorySize);
 		void Initialize(InitFrame initializationType);
 		void ComputeNextGen();
 		void CommitNextGen();

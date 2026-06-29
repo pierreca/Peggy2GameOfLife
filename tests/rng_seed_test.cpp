@@ -22,7 +22,7 @@
 static const int ROWS = 25;
 static const int COLUMNS = 25;
 
-// Same generator the init path uses for every cell (Peggy2ConwayEngine.cpp).
+// Same generator the init path uses for every cell (ConwayEngine.cpp).
 static void fillFrame(int frame[ROWS][COLUMNS])
 {
   for (int i = 0; i < ROWS; i++)

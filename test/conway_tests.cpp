@@ -1,4 +1,4 @@
-// Host unit tests for Peggy2ConwayEngine against canonical Game of Life
+// Host unit tests for ConwayEngine against canonical Game of Life
 // patterns (issue #6). Built off-device against the shared host harness
 // (HostGrid, selected via -DCONWAY_HOST_BUILD; issue #5).
 //
@@ -6,7 +6,7 @@
 // the engine's toroidal wrapping does not affect the expected results and these
 // tests pin standard infinite-grid Conway behavior.
 
-#include "Peggy2ConwayEngine.h"
+#include "ConwayEngine.h"
 
 #include <cstdio>
 #include <vector>
@@ -65,7 +65,7 @@ static bool sameFrame(ConwayGrid* a, ConwayGrid* b)
 }
 
 // advance the engine by one committed generation
-static void advance(Peggy2ConwayEngine& e)
+static void advance(ConwayEngine& e)
 {
   e.ComputeNextGen();
   e.CommitNextGen();
@@ -77,7 +77,7 @@ static void advance(Peggy2ConwayEngine& e)
 static void test_blinker_period2()
 {
   printf("test_blinker_period2\n");
-  Peggy2ConwayEngine e(4);
+  ConwayEngine e(4);
   e.Initialize(Blinker);  // horizontal bar at (12..14, 11)
 
   ConwayGrid gen0 = *e.GetCurrentFrame();
@@ -95,7 +95,7 @@ static void test_blinker_period2()
 static void test_block_still_life()
 {
   printf("test_block_still_life\n");
-  Peggy2ConwayEngine e(4);
+  ConwayEngine e(4);
   e.Initialize(Blinker);          // seeds indices and clears all slots
   setCells(e.GetCurrentFrame(), kBlock);
 
@@ -112,7 +112,7 @@ static void test_glider_translation()
   printf("test_glider_translation\n");
   const Cells expected = {{11, 11}, {13, 11}, {13, 12}, {12, 12}, {12, 13}};
 
-  Peggy2ConwayEngine e(5);
+  ConwayEngine e(5);
   e.Initialize(Blinker);
   setCells(e.GetCurrentFrame(), kGlider);
 
@@ -129,7 +129,7 @@ static void test_rpentomino_population()
   // Independently verified (infinite-grid Conway): 5,6,7,9,8,9,12
   const int expectedPop[] = {5, 6, 7, 9, 8, 9, 12};
 
-  Peggy2ConwayEngine e(4);
+  ConwayEngine e(4);
   e.Initialize(RPentomino);
 
   check(population(e.GetCurrentFrame()) == expectedPop[0], "R-pentomino gen0 population is 5");
@@ -146,7 +146,7 @@ static void test_rpentomino_population()
 static void test_detectloop_still_life()
 {
   printf("test_detectloop_still_life\n");
-  Peggy2ConwayEngine e(4);
+  ConwayEngine e(4);
   e.Initialize(Blinker);
   setCells(e.GetCurrentFrame(), kBlock);
 
@@ -158,7 +158,7 @@ static void test_detectloop_still_life()
 static void test_detectloop_oscillator()
 {
   printf("test_detectloop_oscillator\n");
-  Peggy2ConwayEngine e(4);
+  ConwayEngine e(4);
   e.Initialize(Blinker);
 
   // Step 1: next gen is the vertical phase, not yet seen -> no loop.
@@ -175,7 +175,7 @@ static void test_detectloop_oscillator()
 static void test_detectloop_evolving()
 {
   printf("test_detectloop_evolving\n");
-  Peggy2ConwayEngine e(4);
+  ConwayEngine e(4);
   e.Initialize(Blinker);
   setCells(e.GetCurrentFrame(), kGlider);
 

@@ -13,11 +13,11 @@
 //
 // Build/run (see run.sh; also how it FAILS on the original code, with ASan):
 //   clang++ -std=c++14 -fsanitize=address -g -DCONWAY_HOST_BUILD -I. -Ihost \
-//       test/test_edge_wrap.cpp Peggy2ConwayEngine.cpp -o /tmp/test_edge_wrap
+//       test/test_edge_wrap.cpp ConwayEngine.cpp -o /tmp/test_edge_wrap
 //   /tmp/test_edge_wrap
 
 #define private public
-#include "../Peggy2ConwayEngine.h"
+#include "../ConwayEngine.h"
 #undef private
 
 #include <cstdio>
@@ -41,7 +41,7 @@ static void check(const char* label, int got, int expected)
 int main()
 {
   // genMemorySize of 2 (current + next) is the minimum the engine needs.
-  Peggy2ConwayEngine engine(2);
+  ConwayEngine engine(2);
   engine.Initialize(Glider);          // sets indices; we overwrite the grid below
 
   ConwayGrid* grid = engine.GetCurrentFrame();
