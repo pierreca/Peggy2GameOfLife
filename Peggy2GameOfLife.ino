@@ -10,6 +10,12 @@
 
 #define STEP_PERIOD_MS 500
 
+// How many recent generations to remember for loop detection. Stored as compact
+// 4-byte hashes (not full frames), so this depth is cheap on the AVR's limited
+// RAM (LOOP_HISTORY * 4 bytes) yet catches far longer oscillator periods than
+// the original 4-frame ring. Tune up for more coverage, down to save RAM.
+#define LOOP_HISTORY 32
+
 SimpleTimer timer;
 StepCounter stepCounter;
 ConwayEngine* conwayEngine;
@@ -76,7 +82,7 @@ void ShowCounterScreen(int timeInSeconds)
 
 void setup()
 {
-  conwayEngine = new ConwayEngine(4);
+  conwayEngine = new ConwayEngine(LOOP_HISTORY);
   SeedRandom();
   conwayEngine->Initialize(Random);
   stepCounter.IncrementCount();

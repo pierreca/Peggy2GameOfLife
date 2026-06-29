@@ -235,8 +235,10 @@ int main(int argc, char** argv)
   std::signal(SIGTERM, onSignal);
   atexit(restoreTerminal);
 
-  // 4 generations of loop-detection memory, matching setup() in the sketch.
-  ConwayEngine engine(4);
+  // Deep loop-detection history (cheap hashes; the host has ample RAM). Catches
+  // longer-period oscillators than the firmware's smaller default so you can
+  // watch them reseed instead of looping unnoticed.
+  ConwayEngine engine(128);
   StepCounter stepCounter;
 
   engine.Initialize(opt.pattern);

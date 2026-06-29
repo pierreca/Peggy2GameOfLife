@@ -25,7 +25,7 @@ int main()
 {
   printf("Conway engine host smoke test\n");
 
-  // 4 generations of memory, matching the sketch.
+  // Loop-detection history depth (unused by this single-step smoke test).
   ConwayEngine engine(4);
   engine.Initialize(Blinker);
 
