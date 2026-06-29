@@ -98,6 +98,12 @@ void ConwayEngine::CommitNextGen()
 
 bool ConwayEngine::DetectLoop()
 {
+  // A zero-length history disables loop detection entirely.
+  if (this->loopHistorySize == 0)
+  {
+    return false;
+  }
+
   // The just-computed next generation loops the simulation if its state matches
   // any recent generation. Compare hashes rather than full frames so the history
   // can stay deep cheaply (see the header note on the collision trade-off).
@@ -140,6 +146,12 @@ uint32_t ConwayEngine::hashFrame(ConwayGrid* frame)
 // window is full.
 void ConwayEngine::recordHash(uint32_t hash)
 {
+  // Nothing to record (and no modulo by zero) when detection is disabled.
+  if (this->loopHistorySize == 0)
+  {
+    return;
+  }
+
   this->loopHashes[this->loopHashHead] = hash;
   this->loopHashHead = (this->loopHashHead + 1) % this->loopHistorySize;
   if (this->loopHashCount < this->loopHistorySize)

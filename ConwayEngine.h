@@ -21,8 +21,16 @@ class ConwayEngine
 		// than the old 4-frame ring could. The trade-off is a ~2^-32 chance that a
 		// hash collision reports a loop one generation early, which for an
 		// autonomous display only means an occasional slightly-early reseed.
+		// A size of 0 disables loop detection (DetectLoop always returns false).
 		ConwayEngine(unsigned short loopHistorySize);
 		~ConwayEngine();
+
+		// The engine owns raw heap buffers (frames + hash history) and frees them
+		// in the destructor, so it must not be copied: a shallow copy would alias
+		// those pointers and double-free. It is only ever held by pointer/reference.
+		ConwayEngine(const ConwayEngine&) = delete;
+		ConwayEngine& operator=(const ConwayEngine&) = delete;
+
 		void Initialize(InitFrame initializationType);
 		void ComputeNextGen();
 		void CommitNextGen();

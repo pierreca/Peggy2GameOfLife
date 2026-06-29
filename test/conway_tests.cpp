@@ -229,6 +229,24 @@ static void test_detectloop_long_period_shallow_misses()
   check(firedAt == -1, "shallow history never falsely fires on a long-period glider");
 }
 
+// A zero-length history disables loop detection: even a still life (which would
+// otherwise be caught immediately) must never trigger, with no UB from the
+// modulo-by-size in the history bookkeeping.
+static void test_detectloop_disabled_with_zero_history()
+{
+  printf("test_detectloop_disabled_with_zero_history\n");
+  ConwayEngine e(0);
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kBlock);
+
+  for (int gen = 0; gen < 5; gen++)
+  {
+    e.ComputeNextGen();
+    check(!e.DetectLoop(), "DetectLoop disabled when history size is 0");
+    e.CommitNextGen();
+  }
+}
+
 int main()
 {
   test_blinker_period2();
@@ -240,6 +258,7 @@ int main()
   test_detectloop_evolving();
   test_detectloop_long_period_deep_history();
   test_detectloop_long_period_shallow_misses();
+  test_detectloop_disabled_with_zero_history();
 
   printf("\n%d checks, %d failures\n", g_checks, g_failures);
   if (g_failures == 0) printf("ALL TESTS PASSED\n");
