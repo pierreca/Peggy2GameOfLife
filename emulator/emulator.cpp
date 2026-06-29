@@ -19,6 +19,7 @@
 #include <ctime>
 #include <chrono>
 #include <thread>
+#include <unistd.h>
 
 #include "ConwayEngine.h"
 #include "StepCounter.h"
@@ -31,12 +32,24 @@ const char* const CLEAR_SCREEN = "\x1b[2J";
 const char* const CURSOR_HOME  = "\x1b[H";
 const char* const HIDE_CURSOR  = "\x1b[?25l";
 const char* const SHOW_CURSOR  = "\x1b[?25h";
+const char* const ERASE_EOL    = "\x1b[K"; // clear stale chars to the right
+const char* const ERASE_DOWN   = "\x1b[J"; // clear stale rows below the frame
+const char* const ENTER_ALT    = "\x1b[?1049h"; // alternate screen buffer
+const char* const EXIT_ALT     = "\x1b[?1049l";
 
-// Restore the cursor on the way out, however we exit (normal end, Ctrl-C).
+// Only emit terminal-control escapes when stdout is an interactive terminal, so
+// piping the output (tests, CI) stays clean.
+bool isTty() { return isatty(STDOUT_FILENO) != 0; }
+
+// Restore the terminal on the way out, however we exit (normal end, Ctrl-C):
+// leave the alternate screen and make the cursor visible again.
 void restoreTerminal()
 {
-  printf("%s", SHOW_CURSOR);
-  fflush(stdout);
+  if (isTty())
+  {
+    printf("%s%s", SHOW_CURSOR, EXIT_ALT);
+    fflush(stdout);
+  }
 }
 
 volatile std::sig_atomic_t g_stop = 0;
@@ -136,19 +149,25 @@ bool parseArgs(int argc, char** argv, Options& o)
 void renderGrid(ConwayGrid* grid, InitFrame pattern, unsigned int generation,
                 const char* maxCount)
 {
-  static char out[ROWS * (COLUMNS * 2 + 8) + 256];
+  // A live cell is the UTF-8 block "██" = 6 bytes (each █ is 3 bytes), so a full
+  // row can reach COLUMNS*6 bytes. Size for the worst case plus the per-line
+  // erase escape and framing, or dense frames would be silently truncated.
+  static char out[ROWS * (COLUMNS * 6 + 16) + 512];
   int n = 0;
   // append() bounds every write against the buffer's remaining capacity.
   #define append(...) n += snprintf(out + n, sizeof(out) - n, __VA_ARGS__)
+  // endLine() erases any leftover characters to the right before the newline,
+  // so a shorter line never leaves stale glyphs from the previous frame.
+  #define endLine() append("%s\n", ERASE_EOL)
 
   append("%s", CURSOR_HOME);
-  append(" Conway's Game of Life  -  pattern: %-10s\n", patternName(pattern));
-  append(" generation: %-6u   all-time max: %-6s\n", generation, maxCount);
+  append(" Conway's Game of Life  -  pattern: %-10s", patternName(pattern)); endLine();
+  append(" generation: %-6u   all-time max: %-6s", generation, maxCount); endLine();
 
   // Top border.
   append(" +");
   for (int x = 0; x < COLUMNS; x++) append("--");
-  append("+\n");
+  append("+"); endLine();
 
   for (int y = 0; y < ROWS; y++)
   {
@@ -158,14 +177,19 @@ void renderGrid(ConwayGrid* grid, InitFrame pattern, unsigned int generation,
       // Two cells wide so a live square reads roughly square in the terminal.
       append("%s", grid->GetPoint(x, y) ? "\xE2\x96\x88\xE2\x96\x88" : "  ");
     }
-    append("|\n");
+    append("|"); endLine();
   }
 
   // Bottom border.
   append(" +");
   for (int x = 0; x < COLUMNS; x++) append("--");
-  append("+\n");
-  append(" Ctrl-C to quit.\n");
+  append("+"); endLine();
+  // Last line carries no trailing newline: a newline on the bottom row of the
+  // terminal would scroll the whole frame up, so the next CURSOR_HOME redraw
+  // would land on shifted content and duplicate the borders. ERASE_DOWN wipes
+  // any rows left over from a taller previous frame (e.g. the counter screen).
+  append(" Ctrl-C to quit.%s", ERASE_DOWN);
+  #undef endLine
   #undef append
 
   fwrite(out, 1, n, stdout);
@@ -218,7 +242,12 @@ int main(int argc, char** argv)
   engine.Initialize(opt.pattern);
   stepCounter.IncrementCount();
 
-  printf("%s%s", HIDE_CURSOR, CLEAR_SCREEN);
+  // Render into the alternate screen buffer so the animation never pollutes the
+  // user's scrollback and the original terminal contents are restored on exit.
+  if (isTty())
+  {
+    printf("%s%s%s", ENTER_ALT, HIDE_CURSOR, CLEAR_SCREEN);
+  }
 
   InitFrame currentPattern = opt.pattern;
   unsigned int generation = 1;
@@ -264,6 +293,10 @@ int main(int argc, char** argv)
     }
   }
 
-  printf("%sStopped.\n", SHOW_CURSOR);
+  // Leave the alternate screen (and re-show the cursor) before the final
+  // message, so "Stopped." lands on the user's normal terminal, not the alt
+  // buffer we are about to discard. atexit() calls this again; it is harmless.
+  restoreTerminal();
+  printf("Stopped.\n");
   return 0;
 }
