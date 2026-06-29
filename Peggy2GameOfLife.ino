@@ -16,6 +16,20 @@
 // the original 4-frame ring. Tune up for more coverage, down to save RAM.
 #define LOOP_HISTORY 32
 
+// Max-generation watchdog (issue #8): force a reseed after this many generations
+// even if no loop is detected, so a glider/spaceship drifting around the torus
+// (or a chaotic field longer than LOOP_HISTORY) can't leave the board looking
+// frozen forever. At STEP_PERIOD_MS this caps a run at ~MAX_GENERATIONS/2
+// seconds. 0 would disable the watchdog.
+#define MAX_GENERATIONS 1000
+
+// Population-stagnation window (issue #9): reseed once the live-cell count has
+// stayed unchanged for this many consecutive generations, catching settled or
+// stuck fields whose exact state never recurs within LOOP_HISTORY. Kept well
+// above LOOP_HISTORY so ordinary oscillators are caught by loop detection first.
+// 0 would disable stagnation detection.
+#define POPULATION_WINDOW 150
+
 SimpleTimer timer;
 StepCounter stepCounter;
 ConwayEngine* conwayEngine;
@@ -47,8 +61,12 @@ void GameOfLifeStep()
   else
   {
     conwayEngine->ComputeNextGen();
-    
-    if (conwayEngine->DetectLoop())
+
+    // Reseed when the field repeats (loop), drifts forever (watchdog), or has
+    // settled into an unchanging population (stagnation) -- any one is enough.
+    if (conwayEngine->DetectLoop() ||
+        conwayEngine->WatchdogExpired() ||
+        conwayEngine->PopulationStagnant())
     {
       displayStepCounter = true;
     }
@@ -82,7 +100,7 @@ void ShowCounterScreen(int timeInSeconds)
 
 void setup()
 {
-  conwayEngine = new ConwayEngine(LOOP_HISTORY);
+  conwayEngine = new ConwayEngine(EngineConfig{LOOP_HISTORY, MAX_GENERATIONS, POPULATION_WINDOW});
   SeedRandom();
   conwayEngine->Initialize(Random);
   stepCounter.IncrementCount();

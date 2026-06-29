@@ -64,7 +64,8 @@ struct Options
   unsigned int seed = 0;      // 0 => derive from wall-clock time
   bool seedSet = false;
   bool once = false;          // stop after the first loop is detected
-  long maxGen = 0;            // 0 => unbounded (matches the firmware)
+  long maxGen = 0;            // 0 => watchdog disabled (opt-in here; on in the firmware)
+  long popWindow = 0;         // 0 => stagnation detection disabled (opt-in here)
 };
 
 bool parsePattern(const char* s, InitFrame& out)
@@ -94,7 +95,8 @@ void usage(const char* prog)
   printf("  --delay <ms>      pause between generations (default 120)\n");
   printf("  --seed <n>        RNG seed for a reproducible run (default: time-based)\n");
   printf("  --once            stop after the first detected loop instead of reseeding\n");
-  printf("  --max-gen <n>     reseed after n generations even without a loop (default: unbounded)\n");
+  printf("  --max-gen <n>     reseed after n generations even without a loop (default: off)\n");
+  printf("  --pop-window <n>  reseed after n generations of unchanged population (default: off)\n");
   printf("  --help            show this help\n");
 }
 
@@ -132,6 +134,10 @@ bool parseArgs(int argc, char** argv, Options& o)
     else if (!strcmp(a, "--max-gen") && i + 1 < argc)
     {
       o.maxGen = atol(argv[++i]);
+    }
+    else if (!strcmp(a, "--pop-window") && i + 1 < argc)
+    {
+      o.popWindow = atol(argv[++i]);
     }
     else
     {
@@ -198,11 +204,11 @@ void renderGrid(ConwayGrid* grid, InitFrame pattern, unsigned int generation,
 
 // The host stand-in for ShowCounterScreen(): the firmware draws LAST/MAX onto
 // the Peggy with PeggyWriter, which has no host equivalent, so we print it.
-void showCounterScreen(StepCounter& counter, const Options& o, bool looped)
+void showCounterScreen(StepCounter& counter, const Options& o, const char* reason)
 {
   printf("%s%s", CURSOR_HOME, CLEAR_SCREEN);
   printf("\n\n   +--------------------------+\n");
-  printf("   |  %-24s|\n", looped ? "LOOP DETECTED" : "MAX GEN REACHED");
+  printf("   |  %-24s|\n", reason);
   printf("   |                          |\n");
   printf("   |  LAST: %-6s            |\n", counter.GetCurrentCountString());
   printf("   |  MAX:  %-6s            |\n", counter.GetMaxCountString());
@@ -237,8 +243,12 @@ int main(int argc, char** argv)
 
   // Deep loop-detection history (cheap hashes; the host has ample RAM). Catches
   // longer-period oscillators than the firmware's smaller default so you can
-  // watch them reseed instead of looping unnoticed.
-  ConwayEngine engine(128);
+  // watch them reseed instead of looping unnoticed. The watchdog and stagnation
+  // backstops are opt-in here (--max-gen / --pop-window) so an unbounded run is
+  // the default for inspection; the firmware enables both.
+  ConwayEngine engine(EngineConfig{128,
+                                   (unsigned long)opt.maxGen,
+                                   (unsigned short)opt.popWindow});
   StepCounter stepCounter;
 
   engine.Initialize(opt.pattern);
@@ -262,11 +272,19 @@ int main(int argc, char** argv)
 
     engine.ComputeNextGen();
 
+    // Same termination heuristics as the firmware, in the same order
+    // (loop -> watchdog -> stagnation), evaluated by the engine so the host and
+    // the board share one implementation and label a step identically.
     bool looped = engine.DetectLoop();
-    bool watchdog = opt.maxGen > 0 && (long)generation >= opt.maxGen;
+    bool watchdog = engine.WatchdogExpired();
+    bool stagnant = engine.PopulationStagnant();
 
-    if (looped || watchdog)
+    if (looped || watchdog || stagnant)
     {
+      const char* reason = looped   ? "LOOP DETECTED"
+                         : watchdog  ? "MAX GEN REACHED"
+                                     : "POPULATION STAGNANT";
+
       // Commit so the counter screen / final frame reflects the latest step.
       engine.CommitNextGen();
       stepCounter.IncrementCount();
@@ -274,7 +292,7 @@ int main(int argc, char** argv)
                  stepCounter.GetMaxCountString());
       sleepMs(opt.delayMs);
 
-      showCounterScreen(stepCounter, opt, looped);
+      showCounterScreen(stepCounter, opt, reason);
 
       if (opt.once || g_stop)
       {

@@ -1,18 +1,31 @@
 #include <stdlib.h>
 #include "ConwayEngine.h"
 
-ConwayEngine::ConwayEngine(unsigned short loopHistorySize)
+ConwayEngine::ConwayEngine(const EngineConfig& config)
 {
-  this->loopHistorySize = loopHistorySize;
-  this->loopHashes = new uint32_t[loopHistorySize];
+  this->loopHistorySize = config.loopHistorySize;
+  this->loopHashes = new uint32_t[loopHistorySize]; // new[0] is valid and freeable
   this->loopHashCount = 0;
   this->loopHashHead = 0;
+
+  this->maxGenerations = config.maxGenerations;
+  this->generationCount = 0;
+
+  this->populationWindow = config.populationWindow;
+  this->lastPopulation = -1;
+  this->stagnantRun = 0;
 
   this->genMemory = new ConwayGrid*[frameCount];
   for (unsigned short i = 0; i < frameCount; i++)
   {
     this->genMemory[i] = new ConwayGrid();
   }
+}
+
+// Convenience: loop detection only, both backstops disabled.
+ConwayEngine::ConwayEngine(unsigned short loopHistorySize)
+  : ConwayEngine(EngineConfig{loopHistorySize, 0, 0})
+{
 }
 
 ConwayEngine::~ConwayEngine()
@@ -33,6 +46,12 @@ void ConwayEngine::Initialize(InitFrame initializationType)
   // A fresh run shares no loop-detection history with the previous one.
   this->loopHashCount = 0;
   this->loopHashHead = 0;
+
+  // Reset both backstops: the seeded frame is generation 1, and no population
+  // has been recorded yet for this run.
+  this->generationCount = 1;
+  this->lastPopulation = -1;
+  this->stagnantRun = 0;
 
   this->genMemory[this->currentGenIndex]->HardwareInit();
   this->genMemory[this->nextGenIndex]->Clear();
@@ -73,6 +92,14 @@ void ConwayEngine::ComputeNextGen()
   // a test or a non-random Initialize) is captured too.
   this->recordHash(this->hashFrame(currentGen));
 
+  // Track the current generation's population for stagnation detection, on the
+  // same frame and at the same point as the hash so both series stay aligned.
+  // Skipped when disabled to avoid scanning the whole frame for nothing.
+  if (this->populationWindow > 0)
+  {
+    this->recordPopulation(this->countPopulation(currentGen));
+  }
+
   for (int i = 0; i < ROWS; i++)
   {
     for (int j = 0; j < COLUMNS; j++)
@@ -94,6 +121,7 @@ void ConwayEngine::CommitNextGen()
 {
   this->currentGenIndex = (this->currentGenIndex + 1) % frameCount;
   this->nextGenIndex = (this->nextGenIndex + 1) % frameCount;
+  this->generationCount++;
 }
 
 bool ConwayEngine::DetectLoop()
@@ -118,6 +146,26 @@ bool ConwayEngine::DetectLoop()
   }
 
   return false;
+}
+
+// Max-generation watchdog: a run that has been displayed for maxGenerations
+// committed generations is forced to reseed, regardless of loop detection. This
+// is the backstop for gliders/spaceships and long-period or chaotic fields that
+// never recur within the loop-history window. A 0 cap disables it.
+bool ConwayEngine::WatchdogExpired()
+{
+  return this->maxGenerations > 0 && this->generationCount >= this->maxGenerations;
+}
+
+// Population stagnation: when the live-cell count has not changed for
+// populationWindow consecutive generations the field is treated as settled or
+// stuck and forced to reseed. Cheaper and complementary to loop detection (no
+// exact state match needed) and orthogonal to the watchdog. A 0 window disables
+// it. (recordPopulation only runs while enabled, so stagnantRun is meaningless
+// otherwise; the window guard here keeps that case quiet.)
+bool ConwayEngine::PopulationStagnant()
+{
+  return this->populationWindow > 0 && this->stagnantRun >= this->populationWindow;
 }
 
 // FNV-1a over the frame's cells, packed one row at a time. COLUMNS <= 32 so each
@@ -157,6 +205,37 @@ void ConwayEngine::recordHash(uint32_t hash)
   if (this->loopHashCount < this->loopHistorySize)
   {
     this->loopHashCount++;
+  }
+}
+
+// Count the live cells in a frame (for stagnation detection).
+unsigned short ConwayEngine::countPopulation(ConwayGrid* frame)
+{
+  unsigned short count = 0;
+  for (int y = 0; y < ROWS; y++)
+  {
+    for (int x = 0; x < COLUMNS; x++)
+    {
+      if (frame->GetPoint(x, y)) count++;
+    }
+  }
+  return count;
+}
+
+// Extend or restart the run of consecutive equal-population generations. The
+// counter saturates instead of wrapping so a population that stays constant far
+// past the window (e.g. with stagnation detection enabled but its result
+// ignored) can never silently roll back under the window.
+void ConwayEngine::recordPopulation(unsigned short population)
+{
+  if (this->lastPopulation == (int)population)
+  {
+    if (this->stagnantRun < 0xFFFF) this->stagnantRun++;
+  }
+  else
+  {
+    this->lastPopulation = (int)population;
+    this->stagnantRun = 1;
   }
 }
 
