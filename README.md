@@ -16,7 +16,7 @@ You will need the **Peggy2Serial** and **SimpleTimer** libraries in your Arduino
 The simulation engine is decoupled from the Peggy 2 hardware (see [Architecture](#architecture)), so the Conway logic compiles and runs on a normal machine with nothing more than a C++ compiler (clang or gcc) and `make` — no Arduino toolchain, no Peggy2Serial. This is what the tests use.
 
 ### Watch it run in your terminal
-A small host-only visualizer runs the **real** engine against `HostGrid` and renders the 25×25 grid to the terminal, one generation at a time. It mirrors the sketch's main loop (seed → step → loop-detect → step-counter screen → reseed), so you can watch patterns evolve without flashing the board:
+A small host-only visualizer runs the **real** engine against `HostGrid` and renders the 25×25 grid to the terminal, one generation at a time. It mirrors the sketch's main loop (seed → step → check for termination → step-counter screen → reseed), so you can watch patterns evolve without flashing the board:
 
 ```
 make -C emulator run                              # random seed, watchable speed
@@ -24,7 +24,7 @@ make -C emulator run                              # random seed, watchable speed
 ./emulator/emulator --pattern blinker --seed 1 --once   # reproducible; stop at the first loop
 ```
 
-Flags: `--pattern <random|blinker|glider|rpentomino>`, `--delay <ms>`, `--seed <n>` (reproducible run), `--max-gen <n>` (reseed even without a loop), `--once`. Ctrl-C exits cleanly. It cannot reproduce display **flicker** — that is a hardware multiplex / persistence-of-vision property (`RefreshAll` is a no-op on the host).
+Flags: `--pattern <random|blinker|glider|rpentomino>`, `--delay <ms>`, `--seed <n>` (reproducible run), `--max-gen <n>` (reseed after n generations even without a loop), `--pop-window <n>` (reseed after n generations of unchanged population), `--once`. Ctrl-C exits cleanly. It cannot reproduce display **flicker** — that is a hardware multiplex / persistence-of-vision property (`RefreshAll` is a no-op on the host).
 
 # Running the tests
 All tests are self-contained host C++ — no hardware, no third-party libraries. From the repo root:
@@ -32,7 +32,7 @@ All tests are self-contained host C++ — no hardware, no third-party libraries.
 | Suite | Command |
 | --- | --- |
 | Engine smoke test | `make -C host test` |
-| Engine unit tests (blinker, block, glider, R-pentomino, loop detection) | `make -C test` |
+| Engine unit tests (blinker, block, glider, R-pentomino, loop detection, watchdog, population stagnation) | `make -C test` |
 | Toroidal edge-wrap | `sh test/run.sh` |
 | `StepCounter` heap-leak regression | `sh test/run_step_counter.sh` |
 | RNG seeding | `c++ -std=c++11 -Wall tests/rng_seed_test.cpp -o /tmp/rng && /tmp/rng` |
@@ -60,9 +60,14 @@ The rules engine remembers a compact 32-bit *hash* of each recent generation (th
 
 Storing a hash instead of a whole frame makes a deep history cheap, so the engine catches much longer oscillator periods than the original 4-frame design: the firmware keeps 32 generations and the host emulator 128 — enough to catch, for example, a glider's 100-generation recurrence as it wraps around the toroidal grid. The cost is a roughly 2⁻³² chance that a hash collision ends a run one generation early, which for an autonomous display just means an occasional slightly-early reseed.
 
-It still won't catch periods longer than the history window. The remaining ideas:
-* detect an unusually large number of steps (a max-generation watchdog — issue #8)
-* treat a long stretch of unchanged live-cell population as "stuck" (the open second half of issue #9)
+Exact-match detection alone won't catch periods longer than the history window, so two cheap backstops run alongside it; a run reseeds as soon as **any** of the three fire:
+
+* **Max-generation watchdog** (issue #8): after a fixed number of generations (1000 in the firmware) the run reseeds no matter what, so a glider or spaceship drifting around the torus — or a chaotic field with a period longer than the hash window — can't leave the board looking frozen forever.
+* **Population stagnation** (issue #9): if the live-cell count stays unchanged for many generations in a row (150 in the firmware), the field is treated as settled and reseeds. This is tracked in O(1) (a run-length counter, no extra buffer) and the window is kept well above the loop-history depth so ordinary oscillators are caught by exact-match detection first.
+
+Each backstop is an independent engine tunable (`EngineConfig`) and a value of 0 disables it. The host emulator leaves both off by default so you can watch a run indefinitely, and exposes them as the `--max-gen` and `--pop-window` flags.
+
+Ideas still not pursued:
 * actively scan for gliders (computationally very expensive)
 * Renounce the infinite canvas logic (and consider all cells outside of the matrix are dead). the glider would eventually exit.
 

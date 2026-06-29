@@ -247,6 +247,148 @@ static void test_detectloop_disabled_with_zero_history()
   }
 }
 
+// ---- max-generation watchdog (issue #8) ------------------------------------
+
+// Steps mirroring the sketch's state machine; returns the generation at which
+// WatchdogExpired() first fires, or -1 if it never fired within maxSteps. `gen`
+// tracks the engine's committed-generation count: both start at 1 and increment
+// in lockstep (loop `gen++` mirrors CommitNextGen), so a fire at `gen == N`
+// means the engine had N committed generations.
+static int stepUntilWatchdog(ConwayEngine& e, int maxSteps)
+{
+  for (int gen = 1; gen <= maxSteps; gen++)
+  {
+    e.ComputeNextGen();
+    if (e.WatchdogExpired()) return gen;
+    e.CommitNextGen();
+  }
+  return -1;
+}
+
+// With loop detection off, a glider keeps translating forever; the watchdog is
+// the only thing that stops it, and it must fire exactly at the configured cap.
+static void test_watchdog_fires_at_cap()
+{
+  printf("test_watchdog_fires_at_cap\n");
+  ConwayEngine e(EngineConfig{0, 5, 0});   // loop off, cap 5, stagnation off
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kGlider);
+
+  check(stepUntilWatchdog(e, 50) == 5, "watchdog fires at the configured generation cap");
+}
+
+// A zero cap disables the watchdog entirely: an endlessly translating glider
+// must never trip it.
+static void test_watchdog_disabled_when_zero()
+{
+  printf("test_watchdog_disabled_when_zero\n");
+  ConwayEngine e(EngineConfig{0, 0, 0});   // everything off
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kGlider);
+
+  check(stepUntilWatchdog(e, 200) == -1, "watchdog never fires when the cap is 0");
+}
+
+// Re-Initialize starts a fresh run: the generation counter resets, so the
+// watchdog fires at the cap again rather than immediately.
+static void test_watchdog_resets_on_initialize()
+{
+  printf("test_watchdog_resets_on_initialize\n");
+  ConwayEngine e(EngineConfig{0, 5, 0});
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kGlider);
+  check(stepUntilWatchdog(e, 50) == 5, "watchdog fires on the first run");
+
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kGlider);
+  check(stepUntilWatchdog(e, 50) == 5, "watchdog fires again at the cap after re-init");
+}
+
+// ---- population-stagnation detection (issue #9 tail) -----------------------
+
+// Steps mirroring the state machine; returns the generation at which
+// PopulationStagnant() first fires, or -1 within maxSteps.
+static int stepUntilStagnant(ConwayEngine& e, int maxSteps)
+{
+  for (int gen = 1; gen <= maxSteps; gen++)
+  {
+    e.ComputeNextGen();
+    if (e.PopulationStagnant()) return gen;
+    e.CommitNextGen();
+  }
+  return -1;
+}
+
+// A block is a still life: its live-cell count never changes, so with a window
+// of N the stagnation heuristic fires once N consecutive generations have shared
+// the same population.
+static void test_population_stagnation_fires_on_constant_population()
+{
+  printf("test_population_stagnation_fires_on_constant_population\n");
+  ConwayEngine e(EngineConfig{0, 0, 4});   // loop/watchdog off, window 4
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kBlock);
+
+  check(stepUntilStagnant(e, 50) == 4, "stagnation fires after a full window of unchanged population");
+}
+
+// The R-pentomino's population changes every early generation (5,6,7,9,8,9,...),
+// so a short window must never trip while the population keeps moving.
+static void test_population_stagnation_quiet_while_population_changes()
+{
+  printf("test_population_stagnation_quiet_while_population_changes\n");
+  ConwayEngine e(EngineConfig{0, 0, 3});   // window 3
+  e.Initialize(RPentomino);
+
+  // Only step through the early, population-changing generations.
+  check(stepUntilStagnant(e, 6) == -1, "stagnation quiet while population keeps changing");
+}
+
+// A zero window disables stagnation detection: even a still life never trips it.
+static void test_population_stagnation_disabled_when_zero()
+{
+  printf("test_population_stagnation_disabled_when_zero\n");
+  ConwayEngine e(EngineConfig{0, 0, 0});
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kBlock);
+
+  check(stepUntilStagnant(e, 50) == -1, "stagnation never fires when the window is 0");
+}
+
+// Re-Initialize clears the stagnation run, so a fresh constant-population run
+// fires at the window again rather than carrying over.
+static void test_population_stagnation_resets_on_initialize()
+{
+  printf("test_population_stagnation_resets_on_initialize\n");
+  ConwayEngine e(EngineConfig{0, 0, 4});
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kBlock);
+  check(stepUntilStagnant(e, 50) == 4, "stagnation fires on the first run");
+
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kBlock);
+  check(stepUntilStagnant(e, 50) == 4, "stagnation fires again at the window after re-init");
+}
+
+// The single-argument convenience constructor configures loop detection only:
+// the watchdog and stagnation detector stay disabled, so an evolving glider runs
+// indefinitely without either backstop firing.
+static void test_convenience_ctor_leaves_backstops_disabled()
+{
+  printf("test_convenience_ctor_leaves_backstops_disabled\n");
+  ConwayEngine e(4);
+  e.Initialize(Blinker);
+  setCells(e.GetCurrentFrame(), kGlider);
+
+  for (int gen = 0; gen < 50; gen++)
+  {
+    e.ComputeNextGen();
+    check(!e.WatchdogExpired(), "convenience ctor leaves the watchdog disabled");
+    check(!e.PopulationStagnant(), "convenience ctor leaves stagnation disabled");
+    e.CommitNextGen();
+  }
+}
+
 int main()
 {
   test_blinker_period2();
@@ -259,6 +401,14 @@ int main()
   test_detectloop_long_period_deep_history();
   test_detectloop_long_period_shallow_misses();
   test_detectloop_disabled_with_zero_history();
+  test_watchdog_fires_at_cap();
+  test_watchdog_disabled_when_zero();
+  test_watchdog_resets_on_initialize();
+  test_population_stagnation_fires_on_constant_population();
+  test_population_stagnation_quiet_while_population_changes();
+  test_population_stagnation_disabled_when_zero();
+  test_population_stagnation_resets_on_initialize();
+  test_convenience_ctor_leaves_backstops_disabled();
 
   printf("\n%d checks, %d failures\n", g_checks, g_failures);
   if (g_failures == 0) printf("ALL TESTS PASSED\n");
