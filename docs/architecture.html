@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peggy2GameOfLife — Architecture</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1b1f23; --muted: #57606a; --border: #d0d7de;
+    --accent: #0969da; --code-bg: #f6f8fa; --card: #f6f8fa; --badge: #ddf4ff; --badge-fg: #0a3069;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --border: #30363d;
+      --accent: #4493f8; --code-bg: #161b22; --card: #161b22; --badge: #122b44; --badge-fg: #9cd1ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; max-width: 60rem; padding: 2rem 1.25rem 5rem;
+    background: var(--bg); color: var(--fg);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  h1 { font-size: 1.9rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.4rem; margin: 2.4rem 0 .6rem; padding-bottom: .25rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.12rem; margin: 1.5rem 0 .4rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  p.meta { color: var(--muted); margin: 0 0 1.5rem; font-size: .9rem; }
+  nav.toc { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: .8rem 1.2rem; }
+  nav.toc ol { margin: .4rem 0 0; padding-left: 1.3rem; }
+  nav.toc li { margin: .2rem 0; }
+  code { background: var(--code-bg); padding: .12em .4em; border-radius: 5px; font-size: .88em;
+         font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+        padding: .9rem 1rem; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+  th, td { border: 1px solid var(--border); padding: .5rem .7rem; text-align: left; vertical-align: top; }
+  th { background: var(--card); }
+  aside { background: var(--card); border-left: 4px solid var(--accent); border-radius: 0 6px 6px 0;
+          padding: .7rem 1rem; margin: 1.1rem 0; }
+  figure { margin: 1.2rem 0; }
+  figure.mermaid-fig { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
+  figcaption { color: var(--muted); font-size: .87rem; margin-top: .5rem; text-align: center; }
+  article { margin-top: 1rem; }
+  section { margin-top: .5rem; }
+  .badge { display: inline-block; background: var(--badge); color: var(--badge-fg);
+           border-radius: 999px; padding: .05em .6em; font-size: .78rem; font-weight: 600; }
+  .kvs { list-style: none; padding: 0; margin: .4rem 0; }
+  .kvs li { margin: .15rem 0; }
+  .kvs b { display: inline-block; min-width: 9rem; color: var(--muted); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Peggy2GameOfLife — Architecture</h1>
+<p class="meta" data-updated="2026-06-28">Last updated 2026-06-28 · Conway's Game of Life on a <a href="http://shop.evilmadscientist.com/productsmenu/75">Peggy 2.0</a> 25×25 LED matrix</p>
+
+<nav class="toc" aria-label="Table of contents">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#components">Components</a></li>
+    <li><a href="#runtime-flow">Runtime flow</a></li>
+    <li><a href="#build-and-test">Build &amp; test paths</a></li>
+    <li><a href="#decisions">Key conventions &amp; decisions</a></li>
+    <li><a href="#status">Implementation status &amp; roadmap</a></li>
+  </ol>
+</nav>
+
+<article id="overview">
+  <h2>Overview</h2>
+  <p>
+    The project is an Arduino sketch that runs Conway's Game of Life on a Peggy 2.0 board — a 25×25
+    monochrome, multiplexed LED matrix. On power-up it seeds the RNG from analog-pin noise, fills a
+    random first frame, then advances Conway's rules each step. When it detects a short oscillation
+    loop it briefly shows the step count, reseeds, and repeats — so it runs autonomously forever.
+  </p>
+  <p>
+    The defining architectural property is that the <strong>simulation engine is fully decoupled from
+    the display hardware</strong> behind a zero-cost grid abstraction. The same engine code compiles
+    and runs both on the AVR (against a real Peggy 2 framebuffer) and on a development machine
+    (against an in-memory bitmap), which is what makes the logic testable off-device.
+  </p>
+
+  <figure class="mermaid-fig" id="diagram-architecture" data-kind="diagram">
+    <pre class="mermaid">flowchart TB
+  INO["Peggy2GameOfLife.ino — SimpleTimer orchestrator"]
+  ENG["Peggy2ConwayEngine — rules, ring buffer, loop detection"]
+  SC["StepCounter — step counts"]
+  CG{{"ConwayGrid — compile-time typedef"}}
+  PG["Peggy2Grid — on-device wrapper"]
+  HG["HostGrid — in-memory bitmap"]
+  HW[("Peggy 2 LED matrix")]
+  MEM[("plain RAM — host tests")]
+
+  INO --&gt; ENG
+  INO --&gt; SC
+  ENG -- "get/set cells, Equals" --&gt; CG
+  CG -- "default build" --&gt; PG
+  CG -- "-DCONWAY_HOST_BUILD" --&gt; HG
+  PG --&gt; HW
+  HG --&gt; MEM
+  INO -- "display helpers via Device()" --&gt; HW</pre>
+    <figcaption>Static structure. <code>ConwayGrid</code> is a typedef resolved at compile time to one backend; the engine never references <code>Peggy2Serial</code> directly.</figcaption>
+  </figure>
+</article>
+
+<article id="components" data-kind="components">
+  <h2>Components</h2>
+
+  <section id="components-engine">
+    <h3>Peggy2ConwayEngine <span class="badge">core</span></h3>
+    <p>Files: <code>Peggy2ConwayEngine.h</code> / <code>.cpp</code>. The simulation itself, with no hardware knowledge.</p>
+    <ul class="kvs">
+      <li><b>State</b> a ring of <code>genMemorySize</code> <code>ConwayGrid</code> frames, plus <code>currentGenIndex</code> / <code>nextGenIndex</code> (constructed with <code>4</code> in the sketch).</li>
+      <li><b>ComputeNextGen()</b> writes the next generation into the next frame; reads the current frame through the grid interface.</li>
+      <li><b>CommitNextGen()</b> advances the ring indices (modulo <code>genMemorySize</code>).</li>
+      <li><b>DetectLoop()</b> compares the just-computed frame against the others via <code>ConwayGrid::Equals</code>.</li>
+      <li><b>Rule</b> (<code>isAlive</code>): survives on 2 live neighbours, born on 3, dead otherwise.</li>
+      <li><b>Neighbours</b> (<code>getNeighborCount</code>/<code>getCurrentCell</code>): 8-neighbourhood with toroidal wrap (see <a href="#decisions-wrap">decisions</a>).</li>
+    </ul>
+  </section>
+
+  <section id="components-grid">
+    <h3>ConwayGrid abstraction <span class="badge">seam</span></h3>
+    <p>
+      <code>ConwayGrid.h</code> is a compile-time <code>typedef</code> — no virtual dispatch, no per-cell cost — that selects a backend by build flag. <code>GridDimensions.h</code> defines <code>ROWS</code>/<code>COLUMNS</code> (25×25). The interface is just what the engine needs: <code>HardwareInit</code>, <code>Clear</code>, <code>WritePoint</code>, <code>GetPoint</code>, <code>RefreshAll</code>, <code>Equals</code>.
+    </p>
+    <ul class="kvs">
+      <li><b>Peggy2Grid</b> (<code>Peggy2Grid.h</code>) — on-device. A fully-inlined wrapper over a real <code>Peggy2</code> framebuffer; forwards every call so it costs the same as direct use. Exposes a <code>Device()</code> escape hatch returning the underlying <code>Peggy2*</code> for display-only helpers.</li>
+      <li><b>HostGrid</b> (<code>host/HostGrid.h</code>) — host builds (selected by <code>-DCONWAY_HOST_BUILD</code>). A plain in-memory bitmap (one <code>unsigned long</code> per row). Out-of-range access is dead/no-op; <code>RefreshAll</code> is a no-op.</li>
+    </ul>
+  </section>
+
+  <section id="components-sketch">
+    <h3>Peggy2GameOfLife.ino <span class="badge">orchestrator</span></h3>
+    <p>
+      The Arduino entry point. A <code>SimpleTimer</code> fires <code>GameOfLifeStep()</code> every <code>STEP_PERIOD_MS</code> (500&nbsp;ms); <code>loop()</code> runs the timer and continuously calls <code>RefreshAll</code> on the current frame. <code>SeedRandom()</code> seeds the RNG via <code>srand(analogRead(A0))</code>. Display helpers (<code>Line</code>, <code>PeggyWriter</code>) are reached through <code>GetCurrentFrame()->Device()</code>. Holds the step/display state machine via the <code>displayStepCounter</code> flag.
+    </p>
+  </section>
+
+  <section id="components-stepcounter">
+    <h3>StepCounter <span class="badge">support</span></h3>
+    <p>
+      Files: <code>StepCounter.h</code> / <code>.cpp</code>. Tracks the current run's step count and the all-time maximum since power-on. <code>counterToString</code> fills caller-owned fixed buffers — no per-call heap allocation, so an unattended run never leaks the AVR's small SRAM.
+    </p>
+  </section>
+</article>
+
+<article id="runtime-flow" data-kind="flow">
+  <h2>Runtime flow</h2>
+  <p>
+    The whole program is a small state machine driven by the timer. Compute is double-buffered: the
+    next generation is written into <code>nextGen</code> while <code>currentGen</code> stays on the
+    display, so the shown image never tears mid-step.
+  </p>
+
+  <figure class="mermaid-fig" id="diagram-runtime" data-kind="diagram">
+    <pre class="mermaid">stateDiagram-v2
+  [*] --&gt; Seeding
+  Seeding --&gt; Running : srand(analogRead(A0)), random first frame
+  Running --&gt; Running : ComputeNextGen + CommitNextGen (every 500ms)
+  Running --&gt; ShowCount : DetectLoop() == true
+  ShowCount --&gt; Seeding : show LAST / MAX (~10s), then reseed</pre>
+    <figcaption>Program lifecycle. The <code>ShowCount → Seeding</code> edge is what makes the installation run forever without intervention.</figcaption>
+  </figure>
+
+  <aside>
+    <strong>Why the engine refreshes during compute.</strong> The timer callback runs
+    <em>synchronously</em> inside <code>loop()</code>, so <code>loop()</code>'s own refresh is paused
+    for the entire <code>ComputeNextGen</code> pass. Because the Peggy 2 is a persistence-of-vision
+    matrix, the engine refreshes the displayed frame once per row while computing the next one;
+    otherwise the LEDs visibly dim/flicker each step. On <code>HostGrid</code> this refresh is a no-op.
+  </aside>
+</article>
+
+<article id="build-and-test" data-kind="builds">
+  <h2>Build &amp; test paths</h2>
+  <p>There are two independent build paths — that separation is the point of the grid abstraction.</p>
+
+  <section id="build-and-test-firmware">
+    <h3>Firmware (on-device)</h3>
+    <p>
+      Built and uploaded with the Arduino IDE from <code>Peggy2GameOfLife.ino</code>. Requires the
+      <strong>Peggy2Serial</strong> (provides <code>Peggy2</code>, <code>PeggyWriter</code>) and
+      <strong>SimpleTimer</strong> libraries in the Arduino <code>libraries/</code> folder. The
+      <code>RefreshAll</code> / multiplex display behaviour can only be validated here, on the board.
+    </p>
+  </section>
+
+  <section id="build-and-test-host">
+    <h3>Host tests (off-device)</h3>
+    <p>Pure host C++; needs only clang/gcc and <code>make</code> — no Arduino toolchain, no third-party libraries. From the repo root:</p>
+    <table>
+      <thead><tr><th>Suite</th><th>Command</th><th>What it pins</th></tr></thead>
+      <tbody>
+        <tr><td>Engine smoke</td><td><code>make -C host test</code></td><td>Engine constructs &amp; advances a blinker</td></tr>
+        <tr><td>Engine unit tests</td><td><code>make -C test</code></td><td>Blinker, block, glider, R-pentomino, loop detection (24 checks)</td></tr>
+        <tr><td>Toroidal edge-wrap</td><td><code>sh test/run.sh</code></td><td>Neighbour counts wrap correctly at the edges (host-portable)</td></tr>
+        <tr><td>StepCounter leak</td><td><code>sh test/run_step_counter.sh</code></td><td>No per-call heap allocation across 20k calls</td></tr>
+        <tr><td>RNG seeding</td><td><code>c++ -std=c++11 -Wall tests/rng_seed_test.cpp -o /tmp/rng &amp;&amp; /tmp/rng</code></td><td>The seeded generator is the one init draws from</td></tr>
+      </tbody>
+    </table>
+    <aside>
+      Some suites can additionally build under AddressSanitizer (<code>sh test/run.sh</code>,
+      <code>make -C test test-asan</code>). In sandboxed environments the ASan runtime may hang at
+      startup; the default UBSan / plain builds carry the same assertions, so the suites still verify
+      without it.
+    </aside>
+  </section>
+</article>
+
+<article id="decisions" data-kind="decisions">
+  <h2>Key conventions &amp; decisions</h2>
+
+  <section id="decisions-grid" data-decision="grid-abstraction">
+    <h3>Zero-cost grid abstraction over the hardware</h3>
+    <p>
+      Rather than have the engine reach into a <code>Peggy2</code> framebuffer directly, it talks to a
+      <code>ConwayGrid</code> typedef resolved at compile time. This makes the engine testable on a
+      host while keeping on-device code identical to direct calls (the README's long-standing wish to
+      abstract the dependency "without a performance hit"). Trade-off: a build flag
+      (<code>CONWAY_HOST_BUILD</code>) now selects the backend, and display-only code uses the
+      <code>Device()</code> escape hatch.
+    </p>
+  </section>
+
+  <section id="decisions-wrap" data-decision="toroidal-wrap">
+    <h3>Toroidal canvas via explicit modulo</h3>
+    <p>
+      Conway's rules assume an infinite plane; on the fixed 25×25 matrix the edges wrap (a torus), so
+      e.g. (0,0) neighbours (24,24). The wrap uses signed coordinates and explicit
+      <code>(i + N) % N</code> over <code>ROWS</code>/<code>COLUMNS</code>, so it behaves identically on
+      the 16-bit-<code>int</code> AVR and a 32-bit-<code>int</code> host. (The original
+      <code>x == -1</code> test only wrapped by accident of 16-bit integer promotion and broke under
+      host tests.) Making this configurable — toroidal vs. dead-border — is open work.
+    </p>
+  </section>
+
+  <section id="decisions-detection" data-decision="loop-detection">
+    <h3>Loop detection bounded by ring size</h3>
+    <p>
+      Termination is detected by comparing each new frame against the few previous frames held in the
+      ring (4). This catches still-lifes and short oscillators but not spaceships/gliders (which keep
+      translating on the torus) or long-period oscillators. A max-generation watchdog and a cheaper
+      hash-based history are tracked as open enhancements.
+    </p>
+  </section>
+
+  <section id="decisions-seeding" data-decision="rng-seeding">
+    <h3>RNG seeded from analog noise, before the first frame</h3>
+    <p>
+      <code>InitializeRandom()</code> draws from stdlib <code>rand()</code>, so the same generator is
+      seeded via <code>srand(analogRead(A0))</code> — and seeded <em>before</em> the first frame is
+      drawn — so each power-on differs. (Previously the only seeding call seeded Arduino's separate
+      <code>random()</code>, leaving <code>rand()</code> unseeded and every power-on identical.)
+    </p>
+  </section>
+</article>
+
+<article id="status" data-status="in-progress">
+  <h2>Implementation status &amp; roadmap</h2>
+  <p>
+    The resurrection work is organized as a stack of pull requests (host harness → edge-wrap → tests
+    → cleanup → leak fix → RNG → docs), with follow-up PRs addressing review comments on the branch
+    they correct. The items below are the remaining
+    <a href="https://github.com/pierreca/Peggy2GameOfLife/issues">open issues</a>.
+  </p>
+  <table>
+    <thead><tr><th>Area</th><th>Status</th><th>Issue</th></tr></thead>
+    <tbody>
+      <tr><td>Host test harness + engine decoupling</td><td>done (PR stack)</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/5">#5</a></td></tr>
+      <tr><td>Engine unit tests; platform-independent wrap; leak/overflow/RNG/cleanup fixes</td><td>done (PR stack)</td><td>#6, #4, #1, #3, #7</td></tr>
+      <tr><td>Max-generation watchdog (gliders never freeze the display)</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/8">#8</a></td></tr>
+      <tr><td>Better termination detection (hash ring + population stagnation)</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/9">#9</a></td></tr>
+      <tr><td>Configurable edge topology (toroidal vs. dead border)</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/10">#10</a></td></tr>
+      <tr><td>Route remaining magic numbers through ROWS/COLUMNS</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/11">#11</a></td></tr>
+      <tr><td>Local terminal emulator/visualizer</td><td>open</td><td><a href="https://github.com/pierreca/Peggy2GameOfLife/issues/27">#27</a></td></tr>
+    </tbody>
+  </table>
+  <aside>
+    See also the project <a href="../README.md">README</a> (build &amp; run instructions) and
+    <a href="../CLAUDE.md">CLAUDE.md</a> (editing guidance for AI agents).
+  </aside>
+</article>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default' });
+  await mermaid.run();
+</script>
+</body>
+</html>
